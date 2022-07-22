@@ -133,7 +133,8 @@ read_file (const gchar *path)
 
 static void
 sample_cpu_sensors (CockpitSamples *samples,
-                    int hwmonID)
+                    int hwmonID,
+                    gchar *name)
 {
   for (int i = 1; TRUE; i++)
     {
@@ -167,6 +168,10 @@ sample_cpu_sensors (CockpitSamples *samples,
       if (g_str_equal (label_content, "Tctl"))
           continue;
 
+      // only sample CPU Temperature in atk0110
+      if (!g_str_equal (label_content, "CPU Temperature") && g_str_equal (name, "atk0110"))
+          continue;
+
       g_autofree gchar *instance = g_strdup_printf ("hwmon%d %s", hwmonID, label_content);
       cockpit_samples_sample (samples, "cpu.temperature", instance, temperature/1000);
     }
@@ -190,10 +195,11 @@ cockpit_cpu_temperature (CockpitSamples *samples)
       // compare device name with CPU names
       // Intel: coretemp, AMD: k8temp or k10temp, ARM: cpu_thermal
       if (g_str_equal (name, "coretemp") || g_str_equal (name, "cpu_thermal") ||
-          g_str_equal (name, "k8temp") || g_str_equal (name, "k10temp"))
+          g_str_equal (name, "k8temp") || g_str_equal (name, "k10temp") ||
+          g_str_equal (name, "atk0110"))
         {
           // hwmon contains CPU info
-          sample_cpu_sensors (samples, i);
+          sample_cpu_sensors (samples, i, name);
         }
     }
 }

@@ -854,6 +854,13 @@ podman save quay.io/libpod/busybox | sudo -i -u admin podman load
 
         b.wait_in_text("#current-metrics-card-cpu", "60 °C")
 
+        # only sample CPU Temperature in atk0110
+        m.execute("echo atk0110 > /tmp/hwmon/hwmon1/name")
+        m.execute("echo \"MB Temperature\" > /tmp/hwmon/hwmon1/temp1_label && echo \"CPU Temperature\" > /tmp/hwmon/hwmon1/temp2_label")
+        m.execute("echo 70000 > /tmp/hwmon/hwmon1/temp1_input && echo 65000 > /tmp/hwmon/hwmon1/temp2_input")
+
+        b.wait_in_text("#current-metrics-card-cpu", "65 °C")
+
         # Testing on AMD devices
         m.execute("echo k10temp > /tmp/hwmon/hwmon1/name")
         m.execute("echo Tctl > /tmp/hwmon/hwmon1/temp1_label && echo Tccd1 > /tmp/hwmon/hwmon1/temp2_label && echo Tccd3 > /tmp/hwmon/hwmon1/temp3_label")
