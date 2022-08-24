@@ -25,6 +25,11 @@
 #include <string.h>
 #include <unistd.h>
 
+typedef struct {
+  guint64 read;
+  guint64 write;
+} cgroup_values_t;
+
 /* TODO: this should be optimized so we don't allocate network and call open()/close() all the time */
 
 void
@@ -152,4 +157,135 @@ cockpit_disk_samples (CockpitSamples *samples)
 out:
   g_strfreev (lines);
   g_free (contents);
+}
+
+static gchar*
+read_file (const gchar *path)
+{
+  g_autoptr(GError) error = NULL;
+  gchar *contents = NULL;
+  if (!g_file_get_contents (path, &contents, NULL, &error))
+    {
+      /* Do not log:
+       * - file does not exist: process died and can no longer be sampled
+       * - access denied: bridge is not privileged and can't sample all processes
+       * - sometimes ERROR_FAILED is returned with message: "No such process"
+       */
+      if (g_error_matches (error, G_FILE_ERROR, G_FILE_ERROR_NOENT) ||
+          g_error_matches (error, G_FILE_ERROR, G_FILE_ERROR_ACCES) ||
+          (g_error_matches (error, G_FILE_ERROR, G_FILE_ERROR_FAILED) && g_strrstr(error->message, "No such process")))
+        {
+          return NULL;
+        }
+
+      g_warning ("Domain: %s, code: %d, message: %s", g_quark_to_string (error->domain), error->code, error->message);
+      return NULL;
+    }
+
+  return contents;
+}
+
+static void
+table_add_values(GHashTable *table,
+                   gchar *cgroup,
+                   guint64 read,
+                   guint64 write)
+{
+  cgroup_values_t *old = NULL;
+  if ((old = g_hash_table_lookup (table, cgroup)) != NULL)
+    {
+      // update values
+      old->read += read;
+      old->write += write;
+      g_free (cgroup);
+    }
+  else
+    {
+      // create new entry
+      cgroup_values_t *new = g_malloc0 (sizeof (cgroup_values_t));
+      new->read = read;
+      new->write = write;
+      g_hash_table_insert (table, cgroup, new);
+    }
+}
+
+static void
+get_process_io (const gchar *dir_name,
+                GHashTable *table)
+{
+  g_autofree gchar *path = g_strdup_printf ("/proc/%s/io", dir_name);
+  g_autofree gchar *contents = read_file (path);
+  if (!contents)
+    return;
+
+  guint64 read = 0, write = 0;
+  gchar **lines = g_strsplit (contents, "\n", -1);
+  for (guint n = 0; lines != NULL && lines[n] != NULL; n++)
+    {
+      gchar description[32] = {'\0'};
+      guint value;
+      const gchar *line = lines[n];
+      if (strlen (line) == 0)
+        continue;
+
+      if (sscanf (line, "%s %d", description, &value) != 2)
+        {
+          g_warning ("Error parsing line %d of file /proc/%s/io: `%s'", n, dir_name, line);
+          continue;
+        }
+
+      if (g_str_equal (description, "read_bytes:"))
+        read = value;
+      else if (g_str_equal (description, "write_bytes:"))
+        write = value;
+    }
+
+  g_strfreev (lines);
+
+  // get process cgroup
+  g_autofree gchar *cgroup_path = g_strdup_printf ("/proc/%s/cgroup", dir_name);
+  g_autofree gchar *cgroup = read_file (cgroup_path);
+  if (!cgroup)
+    return;
+  g_strchomp (cgroup);
+
+  table_add_values(table, g_steal_pointer (&cgroup), read, write);
+}
+
+static void
+sample_table_values (gpointer key,
+                   gpointer value,
+                   gpointer samples)
+{
+  // drop leadin '0::/' from cgroup name
+  cockpit_samples_sample ((CockpitSamples *)samples, "disk.cgroup.read", (gchar *)key + 4, ((cgroup_values_t *)value)->read);
+  cockpit_samples_sample ((CockpitSamples *)samples, "disk.cgroup.written", (gchar *)key + 4, ((cgroup_values_t *)value)->write);
+}
+
+void
+cockpit_cgroup_disk_usage (CockpitSamples *samples)
+{
+  g_autoptr(GError) error = NULL;
+  g_autoptr(GDir) dir = g_dir_open ("/proc", 0, &error);
+
+  if (error)
+    {
+      g_warning ("Error when opening directory: %s", error->message);
+      return;
+    }
+
+  GHashTable *table = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+  g_autofree const gchar *dir_name = NULL;
+  while ((dir_name = g_dir_read_name (dir)) != NULL)
+    {
+      // directory name is PID of a process, PID is an unsigned int starting from 1
+      // when g_ascii_strtoull returns 0 it is not a PID directory
+      if (g_ascii_strtoull (dir_name, NULL, 10))
+        {
+          get_process_io (dir_name, table);
+        }
+    }
+
+  g_hash_table_foreach (table, sample_table_values, samples);
+  g_hash_table_unref (table);
 }
