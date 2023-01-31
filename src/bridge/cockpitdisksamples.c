@@ -28,6 +28,8 @@
 typedef struct {
   guint64 read;
   guint64 write;
+  guint64 upload;
+  guint64 download;
 } cgroup_values_t;
 
 /* TODO: this should be optimized so we don't allocate network and call open()/close() all the time */
@@ -189,7 +191,9 @@ static void
 table_add_values(GHashTable *table,
                    gchar *cgroup,
                    guint64 read,
-                   guint64 write)
+                   guint64 write,
+                   guint64 upload,
+                   guint64 download)
 {
   cgroup_values_t *old = NULL;
   if ((old = g_hash_table_lookup (table, cgroup)) != NULL)
@@ -197,6 +201,8 @@ table_add_values(GHashTable *table,
       // update values
       old->read += read;
       old->write += write;
+      old->upload += upload;
+      old->download += download;
       g_free (cgroup);
     }
   else
@@ -205,20 +211,22 @@ table_add_values(GHashTable *table,
       cgroup_values_t *new = g_malloc0 (sizeof (cgroup_values_t));
       new->read = read;
       new->write = write;
+      new->upload = upload;
+      new->download = download;
       g_hash_table_insert (table, cgroup, new);
     }
 }
 
 static void
-get_process_io (const gchar *dir_name,
-                GHashTable *table)
+get_process_disk_io (const gchar *dir_name,
+                     guint64 *read,
+                     guint64 *write)
 {
   g_autofree gchar *path = g_strdup_printf ("/proc/%s/io", dir_name);
   g_autofree gchar *contents = read_file (path);
   if (!contents)
     return;
 
-  guint64 read = 0, write = 0;
   gchar **lines = g_strsplit (contents, "\n", -1);
   for (guint n = 0; lines != NULL && lines[n] != NULL; n++)
     {
@@ -235,12 +243,30 @@ get_process_io (const gchar *dir_name,
         }
 
       if (g_str_equal (description, "read_bytes:"))
-        read = value;
+        *read = value;
       else if (g_str_equal (description, "write_bytes:"))
-        write = value;
+        *write = value;
     }
 
   g_strfreev (lines);
+}
+
+static void
+get_process_network_io (const gchar *dir_name,
+                        guint64 *upload,
+                        guint64 *download)
+{
+}
+
+static void
+get_process_usage (const gchar *dir_name,
+                GHashTable *table)
+{
+  guint64 read = 0, write = 0;
+  get_process_disk_io (dir_name, &read, &write);
+
+  guint64 upload = 0, download = 0;
+  get_process_network_io (dir_name, &upload, &download);
 
   // get process cgroup
   g_autofree gchar *cgroup_path = g_strdup_printf ("/proc/%s/cgroup", dir_name);
@@ -249,7 +275,7 @@ get_process_io (const gchar *dir_name,
     return;
   g_strchomp (cgroup);
 
-  table_add_values(table, g_steal_pointer (&cgroup), read, write);
+  table_add_values(table, g_steal_pointer (&cgroup), read, write, upload, download);
 }
 
 static void
@@ -282,7 +308,7 @@ cockpit_cgroup_disk_usage (CockpitSamples *samples)
       // when g_ascii_strtoull returns 0 it is not a PID directory
       if (g_ascii_strtoull (dir_name, NULL, 10))
         {
-          get_process_io (dir_name, table);
+          get_process_usage (dir_name, table);
         }
     }
 
