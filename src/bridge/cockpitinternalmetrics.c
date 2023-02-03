@@ -108,6 +108,8 @@ static MetricDescription metric_descriptions[] = {
 
   { "disk.cgroup.read",    "bytes", "counter", TRUE, CGROUP_IO_SAMPLER },
   { "disk.cgroup.written", "bytes", "counter", TRUE, CGROUP_IO_SAMPLER },
+  { "network.cgroup.rx",    "bytes", "counter", TRUE, CGROUP_IO_SAMPLER },
+  { "network.cgroup.tx", "bytes", "counter", TRUE, CGROUP_IO_SAMPLER },
 
   { NULL }
 };

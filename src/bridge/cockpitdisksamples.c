@@ -28,8 +28,8 @@
 typedef struct {
   guint64 read;
   guint64 write;
-  guint64 upload;
-  guint64 download;
+  guint64 transmit;
+  guint64 receive;
 } cgroup_values_t;
 
 /* TODO: this should be optimized so we don't allocate network and call open()/close() all the time */
@@ -192,8 +192,8 @@ table_add_values(GHashTable *table,
                    gchar *cgroup,
                    guint64 read,
                    guint64 write,
-                   guint64 upload,
-                   guint64 download)
+                   guint64 transmit,
+                   guint64 receive)
 {
   cgroup_values_t *old = NULL;
   if ((old = g_hash_table_lookup (table, cgroup)) != NULL)
@@ -201,8 +201,8 @@ table_add_values(GHashTable *table,
       // update values
       old->read += read;
       old->write += write;
-      old->upload += upload;
-      old->download += download;
+      old->transmit += transmit;
+      old->receive += receive;
       g_free (cgroup);
     }
   else
@@ -211,8 +211,8 @@ table_add_values(GHashTable *table,
       cgroup_values_t *new = g_malloc0 (sizeof (cgroup_values_t));
       new->read = read;
       new->write = write;
-      new->upload = upload;
-      new->download = download;
+      new->transmit = transmit;
+      new->receive = receive;
       g_hash_table_insert (table, cgroup, new);
     }
 }
@@ -253,9 +253,47 @@ get_process_disk_io (const gchar *dir_name,
 
 static void
 get_process_network_io (const gchar *dir_name,
-                        guint64 *upload,
-                        guint64 *download)
+                        guint64 *transmit,
+                        guint64 *receive)
 {
+  g_autofree gchar *path = g_strdup_printf ("/proc/%s/net/dev", dir_name);
+  g_autofree gchar *contents = read_file (path);
+  if (!contents)
+    return;
+
+  gchar **lines = g_strsplit (contents, "\n", -1);
+  for (guint n = 0; lines != NULL && lines[n] != NULL; n++)
+    {
+      const gchar *line = lines[n];
+      // skip file header or empty line
+      if (n < 2 || strlen (line) == 0)
+        continue;
+
+      gchar iface_name[32]; // maximum length is 16 chars + ':' is added at the end of interface name
+      guint64 bytes_rx, packets_rx, errors_rx, dropped_rx, fifo_rx, frame_rx, compressed_rx, multicast_rx;
+      guint64 bytes_tx, packets_tx, errors_tx, dropped_tx, fifo_tx, frame_tx, compressed_tx, multicast_tx;
+
+      gint num_parsed = sscanf (line,
+                           "%s %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT
+                           " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT
+                           " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT
+                           " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT " %" G_GUINT64_FORMAT,
+                           iface_name,
+                           &bytes_rx, &packets_rx, &errors_rx, &dropped_rx,
+                           &fifo_rx, &frame_rx, &compressed_rx, &multicast_rx,
+                           &bytes_tx, &packets_tx, &errors_tx, &dropped_tx,
+                           &fifo_tx, &frame_tx, &compressed_tx, &multicast_tx);
+      if (num_parsed != 17)
+        {
+          g_warning ("Error parsing line %d of file /proc/%s/net/dev (num_parsed=%d): `%s'", n, dir_name, num_parsed, line);
+          continue;
+        }
+
+      *receive += bytes_rx;
+      *transmit += bytes_tx;
+    }
+
+  g_strfreev (lines);
 }
 
 static void
@@ -265,8 +303,8 @@ get_process_usage (const gchar *dir_name,
   guint64 read = 0, write = 0;
   get_process_disk_io (dir_name, &read, &write);
 
-  guint64 upload = 0, download = 0;
-  get_process_network_io (dir_name, &upload, &download);
+  guint64 transmit = 0, receive = 0;
+  get_process_network_io (dir_name, &transmit, &receive);
 
   // get process cgroup
   g_autofree gchar *cgroup_path = g_strdup_printf ("/proc/%s/cgroup", dir_name);
@@ -275,7 +313,7 @@ get_process_usage (const gchar *dir_name,
     return;
   g_strchomp (cgroup);
 
-  table_add_values(table, g_steal_pointer (&cgroup), read, write, upload, download);
+  table_add_values(table, g_steal_pointer (&cgroup), read, write, transmit, receive);
 }
 
 static void
@@ -286,8 +324,11 @@ sample_table_values (gpointer key,
   // drop leadin '0::/' from cgroup name
   cockpit_samples_sample ((CockpitSamples *)samples, "disk.cgroup.read", (gchar *)key + 4, ((cgroup_values_t *)value)->read);
   cockpit_samples_sample ((CockpitSamples *)samples, "disk.cgroup.written", (gchar *)key + 4, ((cgroup_values_t *)value)->write);
+  cockpit_samples_sample ((CockpitSamples *)samples, "network.cgroup.tx", (gchar *)key + 4, ((cgroup_values_t *)value)->transmit);
+  cockpit_samples_sample ((CockpitSamples *)samples, "network.cgroup.rx", (gchar *)key + 4, ((cgroup_values_t *)value)->receive);
 }
 
+// TODO change function name
 void
 cockpit_cgroup_disk_usage (CockpitSamples *samples)
 {
