@@ -82,12 +82,18 @@ class Bridge(Router, PackagesListener):
 
         self.peers_rule = PeersRoutingRule(self)
 
+        os_release = self.get_os_release()
+        sudo_cmd = "sudo"
+        # sudo-rs does not support the -A option, so we need to use sudo.ws on ubuntu-2510
+        if os_release["ID"] == "ubuntu" and os_release["VERSION_ID"] == "25.10":
+            sudo_cmd = "sudo.ws"
+
         if args.beipack:
             # Some special stuff for beipack
             self.superuser_rule.set_configs((
                 BridgeConfig({
                     "privileged": True,
-                    "spawn": ["sudo", "-k", "-A", "python3", "-ic", "# cockpit-bridge", "--privileged"],
+                    "spawn": [sudo_cmd, "-k", "-A", "python3", "-ic", "# cockpit-bridge", "--privileged"],
                     "environ": ["SUDO_ASKPASS=ferny-askpass"],
                 }),
             ))
