@@ -6,6 +6,8 @@
 import cockpit from "cockpit";
 import * as ipaddr from "ipaddr.js";
 
+import type { NMConnection, NMConnectionSettings } from "./types";
+
 const _ = cockpit.gettext;
 
 type IPAddress = ipaddr.IPv4 | ipaddr.IPv6;
@@ -314,7 +316,7 @@ export function list_interfaces() {
 // on top of this, remove the multiconnection settings and assign it directly
 // to interface. This is done for Anaconda in order to avoid creating unexpected
 // multiconnections when user modifies the connection during installation.
-export function isNonPersistentMultiCon(connection): boolean {
+export function isNonPersistentMultiCon(connection: NMConnection): boolean {
     const settings = connection?.Settings;
     if (settings &&
         settings.connection.interface_name === undefined &&
@@ -328,7 +330,7 @@ export function isNonPersistentMultiCon(connection): boolean {
     return false;
 }
 
-export function createNewConnSettings(settings, iface_name: string) {
+export function createNewConnSettings(settings: NMConnectionSettings, iface_name: string): NMConnectionSettings {
     const newSettings = {
         ...settings,
         connection: {
@@ -345,7 +347,7 @@ export function createNewConnSettings(settings, iface_name: string) {
     return newSettings;
 }
 
-export function debug() {
+export function debug(...args: unknown[]): void {
     if (window.debugging == "all" || window.debugging?.includes("networkmanager")) // not-covered: debugging
-        console.debug("networkmanager:", ...arguments); // not-covered: debugging
+        console.debug("networkmanager:", ...args); // not-covered: debugging
 }

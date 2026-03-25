@@ -11,13 +11,27 @@ import { fmt_to_fragments } from 'utils.jsx';
 import * as utils from './utils.js';
 import { v4 as uuidv4 } from 'uuid';
 
+import type {
+    CurtainState,
+    NMAccessPoint,
+    NMActiveConnection,
+    NMConnection,
+    NMConnectionSettings,
+    NMDevice,
+    NMInterface,
+    NMIpConfig,
+    NMManager,
+    NMModel,
+    NMSettingsObject,
+} from './types';
+
 import "./networking.scss";
 
 import { show_modal_dialog } from "cockpit-components-dialog.jsx";
 
 const _ = cockpit.gettext;
 
-export function show_error_dialog(title, message) {
+export function show_error_dialog(title: string, message: string) {
     const props = {
         id: "error-popup",
         title,
@@ -32,7 +46,7 @@ export function show_error_dialog(title, message) {
     show_modal_dialog(props, footer);
 }
 
-export function show_unexpected_error(error) {
+export function show_unexpected_error(error: { message?: string } | string) {
     show_error_dialog(_("Unexpected error"), error.message || error);
 }
 
@@ -58,7 +72,7 @@ function show_breaking_change_dialog({ fail_text, anyway_text, action }) {
     show_modal_dialog(props, footer);
 }
 
-export function connection_settings(c) {
+export function connection_settings(c: NMConnection | null | undefined): NMConnectionSettings['connection'] {
     if (c && c.Settings && c.Settings.connection) {
         return c.Settings.connection;
     } else {
@@ -145,7 +159,7 @@ export function NetworkManagerModel() {
      * peculiarities of the NetworkManager API.
      */
 
-    const self = this;
+    const self = this as unknown as NMModel;
     cockpit.event_target(self);
 
     const client = cockpit.dbus("org.freedesktop.NetworkManager", { superuser: "try" });
@@ -1600,7 +1614,7 @@ export function NetworkManagerModel() {
     return self;
 }
 
-export function syn_click(model, fun) {
+export function syn_click(model: NMModel, fun: (...args: unknown[]) => unknown) {
     return function() {
         const self = this;
         const self_args = arguments;
@@ -1610,19 +1624,19 @@ export function syn_click(model, fun) {
     };
 }
 
-export function is_managed(dev) {
+export function is_managed(dev: NMDevice): boolean {
     // Never let the user manage loopback devices, nothing good can come from that.
     return dev.State != 10 && dev.DeviceType != "loopback" && dev.Interface != "lo";
 }
 
-function render_interface_link(iface) {
+function render_interface_link(iface: string) {
     return <Button variant='link' tabindex="0"
                    isInline
                    onClick={() => cockpit.location.go([iface])}>{iface}
     </Button>;
 }
 
-export function device_state_text(dev) {
+export function device_state_text(dev: NMDevice | null | undefined): string {
     if (!dev)
         return _("Inactive");
     if (dev.State == 100 && dev.Carrier === false)
@@ -1636,7 +1650,7 @@ export function device_state_text(dev) {
     return dev.StateText;
 }
 
-export function array_join(elts, sep) {
+export function array_join<T>(elts: T[], sep: T): T[] {
     const result = [];
     for (let i = 0; i < elts.length; i++) {
         result.push(elts[i]);
@@ -1646,7 +1660,7 @@ export function array_join(elts, sep) {
     return result;
 }
 
-export function render_active_connection(dev, with_link, hide_link_local) {
+export function render_active_connection(dev: NMDevice | null | undefined, with_link: boolean, hide_link_local: boolean) {
     const parts = [];
 
     if (!dev)
@@ -1665,7 +1679,7 @@ export function render_active_connection(dev, with_link, hide_link_local) {
         });
     }
 
-    function is_ipv6_link_local(addr) {
+    function is_ipv6_link_local(addr: string) {
         return (addr.indexOf("fe8") === 0 ||
                 addr.indexOf("fe9") === 0 ||
                 addr.indexOf("fea") === 0 ||
@@ -1686,7 +1700,7 @@ export function render_active_connection(dev, with_link, hide_link_local) {
 /* Resource usage monitoring
 */
 
-export function complete_settings(settings, device) {
+export function complete_settings(settings: NMConnectionSettings, device: NMDevice | null | undefined): void {
     if (!device) {
         console.warn("No device to complete settings", JSON.stringify(settings));
         return;
@@ -1705,7 +1719,7 @@ export function complete_settings(settings, device) {
     }
 }
 
-export function settings_applier(model, device, connection) {
+export function settings_applier(model: NMModel, device: NMDevice | null | undefined, connection: NMConnection | null | undefined) {
     /* If we have a connection, we can just update it.
      * Otherwise if the settings has TYPE set, we can add
      * them as a stand-alone object.  Otherwise, we
@@ -1724,7 +1738,7 @@ export function settings_applier(model, device, connection) {
 
     const specialCon = utils.isNonPersistentMultiCon(connection);
 
-    return function (settings) {
+    return function (settings: NMConnectionSettings) {
         if (connection && !specialCon) {
             return connection.apply_settings(settings);
         } else if (settings.connection.type && !specialCon) {
@@ -1741,7 +1755,7 @@ export function settings_applier(model, device, connection) {
     };
 }
 
-export function choice_title(choices, choice, def) {
+export function choice_title(choices: Array<{ choice: string; title: string }>, choice: string, def: string): string {
     for (let i = 0; i < choices.length; i++) {
         if (choices[i].choice == choice)
             return choices[i].title;
@@ -1840,7 +1854,15 @@ const curtain_time = 1.5;
 let settle_time = 1.0;
 const rollback_time = 7.0;
 
-export function with_checkpoint(model, modify, options) {
+interface CheckpointOptions {
+    hack_does_add_or_remove?: boolean;
+    devices?: NMDevice[];
+    rollback_on_failure?: boolean;
+    fail_text?: string;
+    anyway_text?: string;
+}
+
+export function with_checkpoint(model: NMModel, modify: () => Promise<void>, options: CheckpointOptions): void {
     const manager = model.get_manager();
 
     let curtain_timeout;
@@ -1939,7 +1961,7 @@ export function with_checkpoint(model, modify, options) {
             });
 }
 
-export function with_settings_checkpoint(model, modify, options) {
+export function with_settings_checkpoint(model: NMModel, modify: () => Promise<void>, options: Omit<CheckpointOptions, 'fail_text' | 'anyway_text'>): void {
     with_checkpoint(model, modify,
                     {
                         ...options,
@@ -1948,7 +1970,7 @@ export function with_settings_checkpoint(model, modify, options) {
                     });
 }
 
-export function connection_devices(con) {
+export function connection_devices(con: NMConnection | null | undefined): NMDevice[] {
     const devices = [];
 
     if (con)
@@ -1957,25 +1979,25 @@ export function connection_devices(con) {
     return devices;
 }
 
-export function is_interface_connection(iface, connection) {
+export function is_interface_connection(iface: NMInterface, connection: NMConnection | null | undefined): boolean {
     return connection && connection.Interfaces.indexOf(iface) != -1;
 }
 
-export function is_interesting_interface(iface) {
+export function is_interesting_interface(iface: NMInterface): boolean {
     return !iface.Device || is_managed(iface.Device);
 }
 
-export function member_connection_for_interface(group, iface) {
+export function member_connection_for_interface(group: NMConnection | null | undefined, iface: NMInterface): NMConnection | undefined {
     return group?.Members.find(s => is_interface_connection(iface, s));
 }
 
-export function member_interface_choices(model, group) {
+export function member_interface_choices(model: NMModel, group: NMConnection | null | undefined): NMInterface[] {
     return model.list_interfaces().filter(function (iface) {
         return !is_interface_connection(iface, group) && is_interesting_interface(iface);
     });
 }
 
-export function free_member_connection(con) {
+export function free_member_connection(con: NMConnection): Promise<void> | undefined {
     const cs = connection_settings(con);
     if (cs.member_type) {
         delete cs.member_type;
@@ -1986,8 +2008,8 @@ export function free_member_connection(con) {
     }
 }
 
-export function set_member(model, group_connection, group_settings, member_type,
-    iface_name, val) {
+export function set_member(model: NMModel, group_connection: NMConnection | null | undefined, group_settings: NMConnectionSettings, member_type: string,
+    iface_name: string, val: boolean) {
     const iface = model.find_interface(iface_name);
     if (!iface)
         return false;
@@ -2057,7 +2079,7 @@ export function set_member(model, group_connection, group_settings, member_type,
     return true;
 }
 
-export function apply_group_member(choices, model, apply_group, group_connection, group_settings, member_type) {
+export function apply_group_member(choices: Record<string, boolean>, model: NMModel, apply_group: (settings: NMConnectionSettings) => Promise<void>, group_connection: NMConnection | null | undefined, group_settings: NMConnectionSettings, member_type: string) {
     const active_settings = [];
 
     if (!group_connection) {
