@@ -35,7 +35,7 @@ export function show_error_dialog(title: string, message: string) {
     const props = {
         id: "error-popup",
         title,
-        body: <p>{message}</p>
+        body: message
     };
 
     const footer = {
@@ -55,7 +55,7 @@ function show_breaking_change_dialog({ fail_text, anyway_text, action }) {
         titleIconVariant: "warning",
         id: "confirm-breaking-change-popup",
         title: _("Connection will be lost"),
-        body: <p>{fail_text}</p>
+        body: fail_text
     };
 
     const footer = {
@@ -1629,12 +1629,12 @@ export function is_managed(dev: NMDevice): boolean {
     return dev.State != 10 && dev.DeviceType != "loopback" && dev.Interface != "lo";
 }
 
-function render_interface_link(iface: string) {
-    return <Button variant='link' tabindex="0"
-                   isInline
-                   onClick={() => cockpit.location.go([iface])}>{iface}
-    </Button>;
-}
+// function render_interface_link(iface: string) {
+//     return <Button variant='link' tabindex="0"
+//                    isInline
+//                    onClick={() => cockpit.location.go([iface])}>{iface}
+//     </Button>;
+// }
 
 export function device_state_text(dev: NMDevice | null | undefined): string {
     if (!dev)
@@ -1669,7 +1669,7 @@ export function render_active_connection(dev: NMDevice | null | undefined, with_
     const con = dev.ActiveConnection;
 
     if (con && con.Group) {
-        return fmt_to_fragments(_("Part of $0"), with_link ? render_interface_link(con.Group.Interface) : con.Group.Interface);
+        return fmt_to_fragments(_("Part of $0"), with_link ? con.Group.Interface : con.Group.Interface);
     }
 
     const ip4config = con ? con.Ip4Config : dev.Ip4Config;
