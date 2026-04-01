@@ -19,6 +19,7 @@ import type {
     NMConnectionSettings,
     NMDevice,
     NMInterface,
+    NMIPAddress,
     NMIpConfig,
     NMManager,
     NMModel,
@@ -50,7 +51,15 @@ export function show_unexpected_error(error: { message?: string } | string) {
     show_error_dialog(_("Unexpected error"), error.message || error);
 }
 
-function show_breaking_change_dialog({ fail_text, anyway_text, action }) {
+function show_breaking_change_dialog({
+    fail_text,
+    anyway_text,
+    action,
+} : {
+    fail_text: string,
+    anyway_text: string,
+    action: any,
+}) {
     const props = {
         titleIconVariant: "warning",
         id: "confirm-breaking-change-popup",
@@ -206,7 +215,7 @@ export function NetworkManagerModel() {
 
     /* Mostly generic D-Bus stuff.  */
 
-    const objects = { };
+    const objects: Record<string, NMObject> = { };
 
     self.set_curtain = (state) => {
         self.curtain = state;
@@ -255,16 +264,8 @@ export function NetworkManagerModel() {
     function get_object(path, type) {
         if (path == "/")
             return null;
-        function Constructor() {
-            this[' priv'] = { };
-            priv(this).type = type;
-            priv(this).path = path;
-            for (const p in type.props)
-                this[p] = type.props[p].def;
-        }
         if (!objects[path]) {
-            Constructor.prototype = type.prototype;
-            objects[path] = new Constructor();
+            objects[path] = new type(path);
             if (type.refresh)
                 type.refresh(objects[path]);
             if (type.exporters && type.exporters[0])
@@ -988,32 +989,61 @@ export function NetworkManagerModel() {
      * code and using the data conversion functions.
      */
 
-    const type_Ipv4Config = {
-        interfaces: [
+    class NMObject {
+        ' priv': {
+            path: string,
+            type: any,
+        }
+
+        constructor() {
+            console.log("CONSTRUCTING");
+        }
+    }
+
+    class Ipv4Config extends NMObject {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager.IP4Config"
-        ],
+        ];
 
-        props: {
+        static readonly props: Record<string, any> = {
             AddressData: { conv: conv_Array(ip_address_from_nm), def: [] }
-        }
-    };
+        };
 
-    const type_Ipv6Config = {
-        interfaces: [
+        AddressData: NMIPAddress[] = [];
+
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: Ipv4Config, path };
+        }
+    }
+
+    const type_Ipv4Config = Ipv4Config;
+
+    class Ipv6Config extends NMObject {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager.IP6Config"
-        ],
+        ];
 
-        props: {
+        static readonly props: Record<string, any> = {
             AddressData: { conv: conv_Array(ip_address_from_nm), def: [] }
+        };
+
+        AddressData: NMIPAddress[] = [];
+
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: Ipv6Config, path };
         }
-    };
+    }
 
-    const type_AccessPoint = {
-        interfaces: [
+    const type_Ipv6Config = Ipv6Config;
+
+    class AccessPoint extends NMObject {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager.AccessPoint"
-        ],
+        ];
 
-        props: {
+        static readonly props: Record<keyof AccessPoint, any> = {
             Flags: { def: 0 },
             WpaFlags: { def: 0 },
             RsnFlags: { def: 0 },
@@ -1025,9 +1055,9 @@ export function NetworkManagerModel() {
             Bandwidth: { def: 0 }, // MHz
             Strength: { def: 0 },
             LastSeen: { def: -1 }, // CLOCK_BOOTTIME seconds, -1 if never seen
-        },
+        };
 
-        exporters: [
+        static readonly exporters = [
             function (obj) {
                 // Find connection for this SSID (undefined if none exists)
                 obj.Connection = (self.get_settings()?.Connections || []).find(con => {
@@ -1036,61 +1066,48 @@ export function NetworkManagerModel() {
                     return false;
                 });
             }
-        ]
-    };
+        ];
 
-    const type_Connection = {
-        interfaces: [
+        Flags = 0;
+        WpaFlags = 0;
+        RsnFlags = 0;
+        Ssid = "";
+        Frequency = 0; // MHz
+        HwAddress = "";
+        Mode = "";
+        MaxBitrate = 0; // Kbit/s
+        Bandwidth = 0; // MHz
+        Strength = 0;
+        LastSeen = -1; // CLOCK_BOOTTIME seconds, -1 if never seen
+
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: AccessPoint, path };
+        }
+    }
+
+    const type_AccessPoint = AccessPoint;
+
+    class Connection extends NMObject {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager.Settings.Connection"
-        ],
+        ];
 
-        props: {
+        static readonly props: Record<string, any> = {
             Unsaved: { }
-        },
+        };
 
-        signals: {
+        static readonly signals = {
             Updated: handle_updated
-        },
+        };
 
-        refresh: refresh_settings,
+        static readonly refresh = refresh_settings;
 
-        drop: function (obj) {
+        static drop(obj) {
             set_settings(obj, null);
-        },
+        }
 
-        prototype: {
-            copy_settings: function () {
-                return JSON.parse(JSON.stringify(this.Settings));
-            },
-
-            apply_settings: function (settings) {
-                const self = this;
-                try {
-                    return call_object_method(self,
-                                              "org.freedesktop.NetworkManager.Settings.Connection", "Update",
-                                              settings_to_nm(settings, priv(self).orig))
-                            .then(() => {
-                                set_settings(self, settings);
-                            });
-                } catch (e) {
-                    return Promise.reject(e);
-                }
-            },
-
-            activate: function (dev, specific_object) {
-                return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
-                                          "org.freedesktop.NetworkManager", "ActivateConnection",
-                                          objpath(this), objpath(dev), objpath(specific_object))
-                        .then(([active_connection]) => active_connection);
-            },
-
-            delete_: function () {
-                return call_object_method(this, "org.freedesktop.NetworkManager.Settings.Connection", "Delete")
-                        .then(() => undefined);
-            }
-        },
-
-        exporters: [
+        static readonly exporters = [
             function (obj) {
                 obj.Groups = [];
                 obj.Members = [];
@@ -1137,35 +1154,85 @@ export function NetworkManagerModel() {
                     }
                 }
             }
-        ]
+        ];
 
-    };
+        Unsaved = false;
+        // TODO: not sure
+        Settings: any = null;
 
-    const type_ActiveConnection = {
-        interfaces: [
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: Connection, path };
+        }
+
+        copy_settings() {
+            return JSON.parse(JSON.stringify(this.Settings));
+        }
+
+        apply_settings(settings) {
+            try {
+                return call_object_method(this,
+                                          "org.freedesktop.NetworkManager.Settings.Connection", "Update",
+                                          settings_to_nm(settings, priv(this).orig))
+                        .then(() => {
+                            set_settings(this, settings);
+                        });
+            } catch (e) {
+                return Promise.reject(e);
+            }
+        }
+
+        activate(dev, specific_object) {
+            return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
+                                      "org.freedesktop.NetworkManager", "ActivateConnection",
+                                      objpath(this), objpath(dev), objpath(specific_object))
+                    .then(([active_connection]) => active_connection);
+        }
+
+        delete_() {
+            return call_object_method(this, "org.freedesktop.NetworkManager.Settings.Connection", "Delete")
+                    .then(() => undefined);
+        }
+    }
+
+    const type_Connection = Connection;
+
+    class ActiveConnection extends NMObject {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager.Connection.Active"
-        ],
+        ];
 
-        props: {
+        static props: Record<string, any> = {
             Connection: { conv: conv_Object(type_Connection) },
             Ip4Config: { conv: conv_Object(type_Ipv4Config) },
             Ip6Config: { conv: conv_Object(type_Ipv6Config) },
             State: { def: 0 }
             // See below for "Group"
-        },
+        };
 
-        prototype: {
-            deactivate: function() {
-                return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
-                                          "org.freedesktop.NetworkManager", "DeactivateConnection",
-                                          objpath(this))
-                        .then(() => undefined);
-            }
+        Connection: Connection | null = null;
+        Ip4Config: Ipv4Config | null = null;
+        Ip6Config: Ipv6Config | null = null;
+        State = 0 ;
+        Group = null;
+
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: ActiveConnection, path };
         }
-    };
 
-    const type_Device = {
-        interfaces: [
+        deactivate() {
+            return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
+                                      "org.freedesktop.NetworkManager", "DeactivateConnection",
+                                      objpath(this))
+                    .then(() => undefined);
+        }
+    }
+
+    const type_ActiveConnection = ActiveConnection;
+
+    class Device extends NMObject {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager.Device",
             "org.freedesktop.NetworkManager.Device.Wired",
             "org.freedesktop.NetworkManager.Device.Bond",
@@ -1173,16 +1240,16 @@ export function NetworkManagerModel() {
             "org.freedesktop.NetworkManager.Device.Bridge",
             "org.freedesktop.NetworkManager.Device.Vlan",
             "org.freedesktop.NetworkManager.Device.Wireless"
-        ],
+        ];
 
-        props: {
+        static props: Record<keyof Device, any> = {
             DeviceType: { conv: device_type_to_symbol },
             Interface: { },
-            StateText: { prop: "State", conv: device_state_to_text, def: _("Unknown") },
+            StateText: { prop: "State", conv: device_state_to_text },
             State: { },
-            StateReason: { def: [0, 0] }, // [state, reason] tuple
+            StateReason: { }, // [state, reason] tuple
             HwAddress: { },
-            AvailableConnections: { conv: conv_Array(conv_Object(type_Connection)), def: [] },
+            AvailableConnections: { conv: conv_Array(conv_Object(type_Connection)) },
             ActiveConnection: { conv: conv_Object(type_ActiveConnection) },
             Ip4Config: { conv: conv_Object(type_Ipv4Config) },
             Ip6Config: { conv: conv_Object(type_Ipv6Config) },
@@ -1194,139 +1261,14 @@ export function NetworkManagerModel() {
             Speed: { },
             Managed: { def: false },
             // WiFi-specific properties
-            AccessPoints: { conv: conv_Array(conv_Object(type_AccessPoint)), def: [] },
+            AccessPoints: { conv: conv_Array(conv_Object(type_AccessPoint)) },
             ActiveAccessPoint: { conv: conv_Object(type_AccessPoint) },
             // See below for "Members"
-        },
+            Members: { conv: conv_Array(conv_Object(Device)), def: [] },
+        };
 
-        prototype: {
-            activate: function(connection, specific_object) {
-                priv(this).lastFailureReason = undefined; // Clear stale failure reason from previous attempts
-                return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
-                                          "org.freedesktop.NetworkManager", "ActivateConnection",
-                                          objpath(connection), objpath(this), objpath(specific_object))
-                        .then(([active_connection]) => active_connection);
-            },
-
-            activate_with_settings: function(settings, specific_object) {
-                priv(this).lastFailureReason = undefined; // Clear stale failure reason from previous attempts
-                try {
-                    return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
-                                              "org.freedesktop.NetworkManager", "AddAndActivateConnection",
-                                              settings_to_nm(settings), objpath(this), objpath(specific_object))
-                            .then(([path, active_connection_path]) => ({
-                                connection: get_object(path, type_Connection),
-                                active_connection: get_object(active_connection_path, type_ActiveConnection)
-                            }));
-                } catch (e) {
-                    return Promise.reject(e);
-                }
-            },
-
-            disconnect: function () {
-                return call_object_method(this, 'org.freedesktop.NetworkManager.Device', 'Disconnect')
-                        .then(() => undefined);
-            },
-
-            // Request a WiFi scan to populate this.AccessPoints
-            request_scan: function() {
-                utils.debug("request_scan: requesting scan for", this.Interface);
-                call_object_method(this, 'org.freedesktop.NetworkManager.Device.Wireless', 'RequestScan', {})
-                        .catch(error => {
-                            // RequestScan can fail if a scan was recently done, that's OK
-                            console.warn("request_scan: scan failed for", this.Interface + ":", error.toString());
-                        });
-            },
-
-            // Get and clear the last connection failure reason
-            consume_failure_reason: function() {
-                const reason = priv(this).lastFailureReason;
-                priv(this).lastFailureReason = undefined;
-                return reason;
-            },
-
-            // Mark that a pending connection is being cancelled by the user
-            cancel_pending_connection: function() {
-                priv(this).connectionCancelled = true;
-            },
-
-            // Wait for a connection to complete
-            // For WiFi, pass expected_ssid to verify we connected to the right network
-            // Returns a Promise that resolves on success or cancel, rejects with {reason} on failure
-            wait_connection: function(expected_ssid) {
-                priv(this).connectionCancelled = false;
-                utils.debug("wait_connection: starting, iface:", this.Interface, "expected:", expected_ssid, "initial state:", this.State);
-                return new Promise((resolve, reject) => {
-                    let activationStarted = false;
-
-                    const cleanup = () => self.removeEventListener("changed", check);
-
-                    const check = () => {
-                        utils.debug("wait_connection check: state:", this.State, "ssid:", this.ActiveAccessPoint?.Ssid,
-                                    "activeConn:", !!this.ActiveConnection, "activationStarted:", activationStarted,
-                                    "lastFailureReason:", priv(this).lastFailureReason,
-                                    "connectionCancelled:", priv(this).connectionCancelled);
-
-                        // captured a failure?
-                        const reason = this.consume_failure_reason();
-                        if (reason) {
-                            cleanup();
-                            console.warn("wait_connection: connection failed for", this.Interface, "reason:", reason);
-                            const error = new Error("Connection failed");
-                            error.reason = reason;
-                            reject(error);
-                            return;
-                        }
-
-                        // https://networkmanager.dev/docs/api/latest/nm-dbus-types.html#NMDeviceState
-                        switch (this.State) {
-                        case 100: // NM_DEVICE_STATE_ACTIVATED
-                            if (!expected_ssid || this.ActiveAccessPoint?.Ssid === expected_ssid) {
-                                utils.debug("wait_connection: success");
-                                cleanup();
-                                resolve();
-                            }
-                            break;
-
-                        case 30: // NM_DEVICE_STATE_DISCONNECTED; initial state, so wait for activation to start
-                        case 120: // NM_DEVICE_STATE_FAILED
-                            if (priv(this).connectionCancelled) {
-                                cleanup();
-                                utils.debug("wait_connection: cancelled by user");
-                                resolve();
-                            } else {
-                                // Disconnected/failed after
-                                // activation started means user
-                                // cancelled or failure without reason
-                                if (activationStarted && !this.ActiveConnection) {
-                                    cleanup();
-                                    console.warn("wait_connection: connection failed for", this.Interface, "without captured reason");
-                                    reject(new Error("Connection failed"));
-                                }
-                            }
-                            break;
-
-                        case 20: // NM_DEVICE_STATE_UNAVAILABLE
-                        case 110: // NM_DEVICE_STATE_DEACTIVATING
-                            break;
-
-                        // any other state means we're activating
-                        default:
-                            if (!activationStarted) {
-                                utils.debug("wait_connection: activation started");
-                                activationStarted = true;
-                            }
-                        }
-                    };
-
-                    self.addEventListener("changed", check);
-                    check(); // Check current state immediately in case already connected
-                });
-            }
-        },
-
-        exporters: [
-            function (obj) {
+        static readonly exporters = [
+            function (obj: Device) {
                 if (obj.DeviceType === '802-11-wireless') {
                     // When a hidden network (no SSID broadcast) has a saved connection, NetworkManager
                     // duplicates it in AccessPoints: once without SSID (from the beacon), and once with
@@ -1358,8 +1300,164 @@ export function NetworkManagerModel() {
                     utils.debug("Device exporter:", obj.Interface, "has", obj.visibleSsids.length, "visible SSIDs and", obj.hiddenAPCount, "hidden APs");
                 }
             }
-        ]
-    };
+        ];
+
+        DeviceType = null;
+        Interface = null;
+        StateText = _("Unknown");
+        State = null;
+        StateReason: [number, number] = [0, 0]; // [state, reason] tuple
+        HwAddress = null;
+        AvailableConnections: Connection[] = [];
+        ActiveConnection = null;
+        Ip4Config: Ipv4Config | null = null;
+        Ip6Config = null;
+        Udi = null;
+        IdVendor = "";
+        IdModel = "";
+        Driver = "";
+        Carrier = true
+        Speed = null;
+        Managed = false;
+        // WiFi-specific properties
+        AccessPoints: AccessPoint[] = [];
+        ActiveAccessPoint = null;
+        visibleSsids: AccessPoint[] = [];
+        hiddenAPCount = 0;
+
+        Members = [];
+
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: Device, path };
+        }
+
+        activate(connection, specific_object) {
+            priv(this).lastFailureReason = undefined; // Clear stale failure reason from previous attempts
+            return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
+                                      "org.freedesktop.NetworkManager", "ActivateConnection",
+                                      objpath(connection), objpath(this), objpath(specific_object))
+                    .then(([active_connection]) => active_connection);
+        }
+
+        activate_with_settings(settings, specific_object) {
+            priv(this).lastFailureReason = undefined; // Clear stale failure reason from previous attempts
+            try {
+                return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
+                                          "org.freedesktop.NetworkManager", "AddAndActivateConnection",
+                                          settings_to_nm(settings), objpath(this), objpath(specific_object))
+                        .then(([path, active_connection_path]) => ({
+                            connection: get_object(path, type_Connection),
+                            active_connection: get_object(active_connection_path, type_ActiveConnection)
+                        }));
+            } catch (e) {
+                return Promise.reject(e);
+            }
+        }
+
+        disconnect() {
+            return call_object_method(this, 'org.freedesktop.NetworkManager.Device', 'Disconnect')
+                    .then(() => undefined);
+        }
+
+        // Request a WiFi scan to populate this.AccessPoints
+        request_scan() {
+            utils.debug("request_scan: requesting scan for", this.Interface);
+            call_object_method(this, 'org.freedesktop.NetworkManager.Device.Wireless', 'RequestScan', {})
+                    .catch(error => {
+                        // RequestScan can fail if a scan was recently done, that's OK
+                        console.warn("request_scan: scan failed for", this.Interface + ":", error.toString());
+                    });
+        }
+
+        // Get and clear the last connection failure reason
+        consume_failure_reason() {
+            const reason = priv(this).lastFailureReason;
+            priv(this).lastFailureReason = undefined;
+            return reason;
+        }
+
+        // Mark that a pending connection is being cancelled by the user
+        cancel_pending_connection() {
+            priv(this).connectionCancelled = true;
+        }
+
+        // Wait for a connection to complete
+        // For WiFi, pass expected_ssid to verify we connected to the right network
+        // Returns a Promise that resolves on success or cancel, rejects with {reason} on failure
+        wait_connection(expected_ssid) {
+            priv(this).connectionCancelled = false;
+            utils.debug("wait_connection: starting, iface:", this.Interface, "expected:", expected_ssid, "initial state:", this.State);
+            return new Promise((resolve, reject) => {
+                let activationStarted = false;
+
+                const cleanup = () => self.removeEventListener("changed", check);
+
+                const check = () => {
+                    utils.debug("wait_connection check: state:", this.State, "ssid:", this.ActiveAccessPoint?.Ssid,
+                                "activeConn:", !!this.ActiveConnection, "activationStarted:", activationStarted,
+                                "lastFailureReason:", priv(this).lastFailureReason,
+                                "connectionCancelled:", priv(this).connectionCancelled);
+
+                    // captured a failure?
+                    const reason = this.consume_failure_reason();
+                    if (reason) {
+                        cleanup();
+                        console.warn("wait_connection: connection failed for", this.Interface, "reason:", reason);
+                        const error = new Error("Connection failed");
+                        error.reason = reason;
+                        reject(error);
+                        return;
+                    }
+
+                    // https://networkmanager.dev/docs/api/latest/nm-dbus-types.html#NMDeviceState
+                    switch (this.State) {
+                    case 100: // NM_DEVICE_STATE_ACTIVATED
+                        if (!expected_ssid || this.ActiveAccessPoint?.Ssid === expected_ssid) {
+                            utils.debug("wait_connection: success");
+                            cleanup();
+                            resolve();
+                        }
+                        break;
+
+                    case 30: // NM_DEVICE_STATE_DISCONNECTED; initial state, so wait for activation to start
+                    case 120: // NM_DEVICE_STATE_FAILED
+                        if (priv(this).connectionCancelled) {
+                            cleanup();
+                            utils.debug("wait_connection: cancelled by user");
+                            resolve();
+                        } else {
+                            // Disconnected/failed after
+                            // activation started means user
+                            // cancelled or failure without reason
+                            if (activationStarted && !this.ActiveConnection) {
+                                cleanup();
+                                console.warn("wait_connection: connection failed for", this.Interface, "without captured reason");
+                                reject(new Error("Connection failed"));
+                            }
+                        }
+                        break;
+
+                    case 20: // NM_DEVICE_STATE_UNAVAILABLE
+                    case 110: // NM_DEVICE_STATE_DEACTIVATING
+                        break;
+
+                    // any other state means we're activating
+                    default:
+                        if (!activationStarted) {
+                            utils.debug("wait_connection: activation started");
+                            activationStarted = true;
+                        }
+                    }
+                };
+
+                self.addEventListener("changed", check);
+                check(); // Check current state immediately in case already connected
+            });
+        }
+    }
+
+    const type_Device = Device;
 
     // The 'Interface' type does not correspond to any NetworkManager
     // object or interface.  We use it to represent a network device
@@ -1369,10 +1467,10 @@ export function NetworkManagerModel() {
     // This is a HACK: NetworkManager should export Device nodes for
     // these.
 
-    const type_Interface = {
-        interfaces: [],
+    class Interface extends NMObject {
+        static readonly interfaces: string[] = [];
 
-        exporters: [
+        static readonly exporters = [
             function (obj) {
                 obj.Device = null;
                 obj._NonDeviceConnections = [];
@@ -1426,9 +1524,16 @@ export function NetworkManagerModel() {
                     obj.MainConnection = obj.Device.ActiveConnection.Connection;
                 }
             }
-        ]
+        ];
 
-    };
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: Interface, path };
+            console.log("CTOR INTERFACE");
+        }
+    }
+
+    const type_Interface = Interface;
 
     function get_interface(iface) {
         const obj = get_object(":interface:" + iface, type_Interface);
@@ -1440,26 +1545,16 @@ export function NetworkManagerModel() {
         return peek_object(":interface:" + iface);
     }
 
-    const type_Settings = {
-        interfaces: [
+    class Settings extends NMObject {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager.Settings"
-        ],
+        ];
 
-        props: {
+        static readonly props: Record<string, any> = {
             Connections: { conv: conv_Array(conv_Object(type_Connection)), def: [] }
-        },
+        };
 
-        prototype: {
-            add_connection: function (conf) {
-                return call_object_method(this,
-                                          'org.freedesktop.NetworkManager.Settings',
-                                          'AddConnection',
-                                          settings_to_nm(conf, { }))
-                        .then(([path]) => get_object(path, type_Connection));
-            }
-        },
-
-        exporters: [
+        static readonly exporters = [
             null,
 
             // Sets: type_Interface._NonDeviceConnections
@@ -1490,15 +1585,31 @@ export function NetworkManagerModel() {
                     });
                 }
             }
-        ]
-    };
+        ];
 
-    const type_Manager = {
-        interfaces: [
+        [key: string]: any;
+        constructor(path: string) {
+            super()
+            this[' priv'] = { type: Settings, path };
+        }
+
+        add_connection(conf) {
+            return call_object_method(this,
+                                      'org.freedesktop.NetworkManager.Settings',
+                                      'AddConnection',
+                                      settings_to_nm(conf, { }))
+                    .then(([path]) => get_object(path, type_Connection));
+        }
+    }
+
+    const type_Settings = Settings;
+
+    class Manager {
+        static readonly interfaces = [
             "org.freedesktop.NetworkManager"
-        ],
+        ];
 
-        props: {
+        static readonly props: Record<string, any> = {
             Capabilities: { def: [] },
             Version: { },
             Devices: {
@@ -1506,66 +1617,75 @@ export function NetworkManagerModel() {
                 def: []
             },
             ActiveConnections: { conv: conv_Array(conv_Object(type_ActiveConnection)), def: [] }
-        },
+        };
 
-        prototype: {
-            checkpoint_create: function (devices, timeout) {
-                return call_object_method(this,
-                                          'org.freedesktop.NetworkManager',
-                                          'CheckpointCreate',
-                                          devices.map(objpath),
-                                          timeout,
-                                          0)
-                        .then(([checkpoint]) => checkpoint)
-                        .catch(function (error) {
-                            if (error.name != "org.freedesktop.DBus.Error.UnknownMethod")
-                                console.warn(error.message || error);
-                        });
-            },
-
-            checkpoint_destroy: function (checkpoint) {
-                if (checkpoint) {
-                    return call_object_method(this,
-                                              'org.freedesktop.NetworkManager',
-                                              'CheckpointDestroy',
-                                              checkpoint)
-                            .then(() => undefined);
-                } else
-                    return Promise.resolve();
-            },
-
-            checkpoint_rollback: function (checkpoint) {
-                if (checkpoint) {
-                    return call_object_method(this,
-                                              'org.freedesktop.NetworkManager',
-                                              'CheckpointRollback',
-                                              checkpoint)
-                            .then(([result]) => result);
-                } else
-                    return Promise.resolve();
-            }
-        },
-
-        exporters: [
+        static readonly exporters = [
             null,
 
             // Sets: type_Interface.Device
             //
             function (obj) {
                 obj.Devices.forEach(function (dev) {
+                    console.log(dev);
                     if (dev.Interface) {
                         const iface = get_interface(dev.Interface);
                         iface.Device = dev;
                     }
                 });
             }
-        ]
-    };
+        ];
+
+        [key: string]: any;
+
+        constructor(path: string) {
+            this[' priv'] = { type: Manager, path };
+            for (const p in Manager.props)
+                this[p] = Manager.props[p].def;
+        }
+
+        checkpoint_create(devices, timeout) {
+            return call_object_method(this,
+                                      'org.freedesktop.NetworkManager',
+                                      'CheckpointCreate',
+                                      devices.map(objpath),
+                                      timeout,
+                                      0)
+                    .then(([checkpoint]) => checkpoint)
+                    .catch(function (error) {
+                        if (error.name != "org.freedesktop.DBus.Error.UnknownMethod")
+                            console.warn(error.message || error);
+                    });
+        }
+
+        checkpoint_destroy(checkpoint) {
+            if (checkpoint) {
+                return call_object_method(this,
+                                          'org.freedesktop.NetworkManager',
+                                          'CheckpointDestroy',
+                                          checkpoint)
+                        .then(() => undefined);
+            } else
+                return Promise.resolve();
+        }
+
+        checkpoint_rollback(checkpoint) {
+            if (checkpoint) {
+                return call_object_method(this,
+                                          'org.freedesktop.NetworkManager',
+                                          'CheckpointRollback',
+                                          checkpoint)
+                        .then(([result]) => result);
+            } else
+                return Promise.resolve();
+        }
+    }
+
+    const type_Manager = Manager;
 
     /* Now create the cyclic declarations.
      */
     type_ActiveConnection.props.Group = { conv: conv_Object(type_Device) };
-    type_Device.props.Members = { conv: conv_Array(conv_Object(type_Device)), def: [] };
+    // type_Device.props.Members = { conv: conv_Array(conv_Object(type_Device)), def: [] };
 
     /* Accessing the model.
      */
@@ -1611,6 +1731,7 @@ export function NetworkManagerModel() {
     self.ready = undefined;
     self.operationInProgress = undefined;
     self.curtain = undefined;
+    console.log(objects);
     return self;
 }
 

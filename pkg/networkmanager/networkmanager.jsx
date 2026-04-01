@@ -98,6 +98,7 @@ const App = () => {
     }
 
     const interfaces = model.list_interfaces();
+    console.log(interfaces);
 
     /* At this point NM is running and the model is ready */
     if (path.length == 0) {
