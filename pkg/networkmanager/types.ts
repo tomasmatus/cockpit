@@ -150,7 +150,7 @@ export interface AccessPoint {
     Bandwidth: number;
     Strength: number;
     LastSeen: number;
-    Connection?: Connection;
+    Connection: Connection | undefined;
 }
 
 export interface Connection {
@@ -158,7 +158,7 @@ export interface Connection {
     Settings: NMSettings;
     Groups: Connection[];
     Members: Connection[];
-    Interfaces: Interface[];
+    Interfaces: NetworkInterface[];
     copy_settings(): NMSettings;
     apply_settings(settings: NMSettings): Promise<void>;
     activate(dev: Device | null, specific_object: AccessPoint | null): Promise<string>;
@@ -170,45 +170,45 @@ export interface ActiveConnection {
     Ip4Config: Ipv4Config | null;
     Ip6Config: Ipv6Config | null;
     State: number;
-    Group?: Device;
+    Group: Device | null;
     deactivate(): Promise<void>;
 }
 
 export interface Device {
-    DeviceType: string;
+    DeviceType: string; // TODO: NM has specific types, use union
     Interface: string;
     StateText: string;
     State: number;
     StateReason: [number, number];
-    HwAddress: string | undefined;
+    HwAddress: string | null;
     AvailableConnections: Connection[];
     ActiveConnection: ActiveConnection | null;
     Ip4Config: Ipv4Config | null;
     Ip6Config: Ipv6Config | null;
-    Udi: string | undefined;
+    Udi: string | null;
     IdVendor: string;
     IdModel: string;
     Driver: string;
     Carrier: boolean;
-    Speed: number | undefined;
+    Speed: number | null;
     Managed: boolean;
     AccessPoints: AccessPoint[];
     ActiveAccessPoint: AccessPoint | null;
     Members: Device[];
-    visibleSsids?: AccessPoint[];
-    hiddenAPCount?: number;
+    visibleSsids: AccessPoint[];
+    hiddenAPCount: number;
     activate(connection: Connection | null, specific_object: AccessPoint | null): Promise<string>;
     activate_with_settings(settings: NMSettings, specific_object?: AccessPoint | null): Promise<{ connection: Connection; active_connection: ActiveConnection }>;
     disconnect(): Promise<void>;
     request_scan(): void;
     consume_failure_reason(): number | undefined;
     cancel_pending_connection(): void;
-    wait_connection(expected_ssid?: string): Promise<void>;
+    wait_connection(expected_ssid: string): Promise<void>;
 }
 
 /* Synthetic object representing a network interface (may or may not have a kernel Device) */
 
-export interface Interface {
+export interface NetworkInterface {
     Name: string;
     Device: Device | null;
     _NonDeviceConnections: Connection[];
@@ -216,7 +216,8 @@ export interface Interface {
     MainConnection: Connection | null;
 }
 
-export interface NMSettingsManager {
+// TODO: better name
+export interface SettingsManager {
     Connections: Connection[];
     add_connection(conf: NMSettings): Promise<Connection>;
 }

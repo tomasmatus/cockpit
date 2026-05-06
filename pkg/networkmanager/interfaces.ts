@@ -12,18 +12,21 @@ import * as utils from './utils.js';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
-    CurtainState,
-    NMAccessPoint,
-    NMActiveConnection,
-    NMConnection,
-    NMConnectionSettings,
-    NMDevice,
-    NMInterface,
+    AccessPoint,
+    ActiveConnection,
+    Connection,
+    ConnectionSettings,
+    Device,
+    I_Ipv4Config,
+    NetworkInterface,
+    IPConfig,
+    Ipv4Config,
+    Ipv6Config,
+    Manager,
     NMIPAddress,
-    NMIpConfig,
-    NMManager,
-    NMModel,
-    NMSettingsObject,
+    Settings,
+    NMSettingsManager,
+    SettingsManager,
 } from './types';
 
 import "./networking.scss";
@@ -81,7 +84,7 @@ function show_breaking_change_dialog({
     show_modal_dialog(props, footer);
 }
 
-export function connection_settings(c: NMConnection | null | undefined): NMConnectionSettings['connection'] {
+export function connection_settings(c: Connection | null | undefined): ConnectionSettings {
     if (c && c.Settings && c.Settings.connection) {
         return c.Settings.connection;
     } else {
@@ -168,7 +171,7 @@ export function NetworkManagerModel() {
      * peculiarities of the NetworkManager API.
      */
 
-    const self = this as unknown as NMModel;
+    const self = this;
     cockpit.event_target(self);
 
     const client = cockpit.dbus("org.freedesktop.NetworkManager", { superuser: "try" });
@@ -1000,12 +1003,12 @@ export function NetworkManagerModel() {
         }
     }
 
-    class Ipv4Config extends NMObject {
+    class NMIpv4Config extends NMObject implements Ipv4Config {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.IP4Config"
         ];
 
-        static readonly props: Record<string, any> = {
+        static readonly props: Partial<Record<keyof Ipv4Config, any>> = {
             AddressData: { conv: conv_Array(ip_address_from_nm), def: [] }
         };
 
@@ -1013,18 +1016,18 @@ export function NetworkManagerModel() {
 
         constructor(path: string) {
             super()
-            this[' priv'] = { type: Ipv4Config, path };
+            this[' priv'] = { type: NMIpv4Config, path };
         }
     }
 
-    const type_Ipv4Config = Ipv4Config;
+    const type_Ipv4Config = NMIpv4Config;
 
-    class Ipv6Config extends NMObject {
+    class NMIpv6Config extends NMObject implements Ipv6Config {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.IP6Config"
         ];
 
-        static readonly props: Record<string, any> = {
+        static readonly props: Record<keyof Ipv6Config, any> = {
             AddressData: { conv: conv_Array(ip_address_from_nm), def: [] }
         };
 
@@ -1032,18 +1035,18 @@ export function NetworkManagerModel() {
 
         constructor(path: string) {
             super()
-            this[' priv'] = { type: Ipv6Config, path };
+            this[' priv'] = { type: NMIpv6Config, path };
         }
     }
 
-    const type_Ipv6Config = Ipv6Config;
+    const type_Ipv6Config = NMIpv6Config;
 
-    class AccessPoint extends NMObject {
+    class NMAccessPoint extends NMObject implements AccessPoint {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.AccessPoint"
         ];
 
-        static readonly props: Record<keyof AccessPoint, any> = {
+        static readonly props: Partial<Record<keyof AccessPoint, any>> = {
             Flags: { def: 0 },
             WpaFlags: { def: 0 },
             RsnFlags: { def: 0 },
@@ -1058,7 +1061,7 @@ export function NetworkManagerModel() {
         };
 
         static readonly exporters = [
-            function (obj) {
+            function (obj: AccessPoint) {
                 // Find connection for this SSID (undefined if none exists)
                 obj.Connection = (self.get_settings()?.Connections || []).find(con => {
                     if (con.Settings?.["802-11-wireless"]?.ssid)
@@ -1079,21 +1082,22 @@ export function NetworkManagerModel() {
         Bandwidth = 0; // MHz
         Strength = 0;
         LastSeen = -1; // CLOCK_BOOTTIME seconds, -1 if never seen
+        Connection: Connection | undefined = undefined;
 
         constructor(path: string) {
             super()
-            this[' priv'] = { type: AccessPoint, path };
+            this[' priv'] = { type: NMAccessPoint, path };
         }
     }
 
-    const type_AccessPoint = AccessPoint;
+    const type_AccessPoint = NMAccessPoint;
 
-    class Connection extends NMObject {
+    class NMConnection extends NMObject implements Connection {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.Settings.Connection"
         ];
 
-        static readonly props: Record<string, any> = {
+        static readonly props: Partial<Record<keyof Connection, any>> = {
             Unsaved: { }
         };
 
@@ -1103,12 +1107,12 @@ export function NetworkManagerModel() {
 
         static readonly refresh = refresh_settings;
 
-        static drop(obj) {
+        static drop(obj: Connection) {
             set_settings(obj, null);
         }
 
         static readonly exporters = [
-            function (obj) {
+            function (obj: Connection) {
                 obj.Groups = [];
                 obj.Members = [];
                 obj.Interfaces = [];
@@ -1123,7 +1127,7 @@ export function NetworkManagerModel() {
             // Sets:  type_Connection.Members
             //        type_Connection.Groups
             //
-            function (obj) {
+            function (obj: Connection) {
                 // Most of the time, a connection has zero or one groups,
                 // but when a connection refers to its group by interface
                 // name, we might end up with more than one group
@@ -1131,7 +1135,7 @@ export function NetworkManagerModel() {
                 //
                 // TODO - Nail down how NM really handles this.
 
-                function check_con(con) {
+                function check_con(con: Connection) {
                     const group_settings = connection_settings(con);
                     const my_settings = connection_settings(obj);
                     if (group_settings.type == my_settings.member_type) {
@@ -1157,12 +1161,15 @@ export function NetworkManagerModel() {
         ];
 
         Unsaved = false;
-        // TODO: not sure
         Settings: any = null;
+        Groups: Connection[] = [];
+        Members: Connection[] = [];
+        Interfaces: NetworkInterface[] = [];
+
 
         constructor(path: string) {
             super()
-            this[' priv'] = { type: Connection, path };
+            this[' priv'] = { type: NMConnection, path };
         }
 
         copy_settings() {
@@ -1195,14 +1202,14 @@ export function NetworkManagerModel() {
         }
     }
 
-    const type_Connection = Connection;
+    const type_Connection = NMConnection;
 
-    class ActiveConnection extends NMObject {
+    class NMActiveConnection extends NMObject implements ActiveConnection {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.Connection.Active"
         ];
 
-        static props: Record<string, any> = {
+        static props: Partial<Record<keyof ActiveConnection, any>> = {
             Connection: { conv: conv_Object(type_Connection) },
             Ip4Config: { conv: conv_Object(type_Ipv4Config) },
             Ip6Config: { conv: conv_Object(type_Ipv6Config) },
@@ -1213,12 +1220,12 @@ export function NetworkManagerModel() {
         Connection: Connection | null = null;
         Ip4Config: Ipv4Config | null = null;
         Ip6Config: Ipv6Config | null = null;
-        State = 0 ;
-        Group = null;
+        State: number = 0 ;
+        Group: NMDevice | null = null;
 
         constructor(path: string) {
             super()
-            this[' priv'] = { type: ActiveConnection, path };
+            this[' priv'] = { type: NMActiveConnection, path };
         }
 
         deactivate() {
@@ -1229,9 +1236,9 @@ export function NetworkManagerModel() {
         }
     }
 
-    const type_ActiveConnection = ActiveConnection;
+    const type_ActiveConnection = NMActiveConnection;
 
-    class Device extends NMObject {
+    class NMDevice extends NMObject implements Device {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.Device",
             "org.freedesktop.NetworkManager.Device.Wired",
@@ -1242,29 +1249,19 @@ export function NetworkManagerModel() {
             "org.freedesktop.NetworkManager.Device.Wireless"
         ];
 
-        static props: Record<keyof Device, any> = {
+        static props: Partial<Record<keyof NMDevice, any>> = {
             DeviceType: { conv: device_type_to_symbol },
-            Interface: { },
             StateText: { prop: "State", conv: device_state_to_text },
-            State: { },
-            StateReason: { }, // [state, reason] tuple
-            HwAddress: { },
             AvailableConnections: { conv: conv_Array(conv_Object(type_Connection)) },
             ActiveConnection: { conv: conv_Object(type_ActiveConnection) },
             Ip4Config: { conv: conv_Object(type_Ipv4Config) },
             Ip6Config: { conv: conv_Object(type_Ipv6Config) },
             Udi: { trigger: refresh_udev },
-            IdVendor: { def: "" },
-            IdModel: { def: "" },
-            Driver: { def: "" },
-            Carrier: { def: true },
-            Speed: { },
-            Managed: { def: false },
             // WiFi-specific properties
             AccessPoints: { conv: conv_Array(conv_Object(type_AccessPoint)) },
             ActiveAccessPoint: { conv: conv_Object(type_AccessPoint) },
             // See below for "Members"
-            Members: { conv: conv_Array(conv_Object(Device)), def: [] },
+            Members: { conv: conv_Array(conv_Object(NMDevice)), def: [] },
         };
 
         static readonly exporters = [
@@ -1302,37 +1299,37 @@ export function NetworkManagerModel() {
             }
         ];
 
-        DeviceType = null;
-        Interface = null;
-        StateText = _("Unknown");
-        State = null;
+        DeviceType: string = "";
+        Interface: string = "";
+        StateText: string = _("Unknown");
+        State: number = 0;
         StateReason: [number, number] = [0, 0]; // [state, reason] tuple
-        HwAddress = null;
+        HwAddress: string | null = null;
         AvailableConnections: Connection[] = [];
-        ActiveConnection = null;
+        ActiveConnection: ActiveConnection | null = null;
         Ip4Config: Ipv4Config | null = null;
-        Ip6Config = null;
-        Udi = null;
-        IdVendor = "";
-        IdModel = "";
-        Driver = "";
-        Carrier = true
-        Speed = null;
-        Managed = false;
+        Ip6Config: Ipv6Config | null = null;
+        Udi: string | null = null;
+        IdVendor: string = "";
+        IdModel: string = "";
+        Driver: string = "";
+        Carrier: boolean = true;
+        Speed: number | null = null;
+        Managed: boolean = false;
         // WiFi-specific properties
         AccessPoints: AccessPoint[] = [];
-        ActiveAccessPoint = null;
+        ActiveAccessPoint: AccessPoint | null = null;
         visibleSsids: AccessPoint[] = [];
-        hiddenAPCount = 0;
+        hiddenAPCount: number = 0;
 
-        Members = [];
+        Members: Device[] = [];
 
         constructor(path: string) {
             super()
-            this[' priv'] = { type: Device, path };
+            this[' priv'] = { type: NMDevice, path };
         }
 
-        activate(connection, specific_object) {
+        activate(connection: Connection, specific_object: NMObject) {
             priv(this).lastFailureReason = undefined; // Clear stale failure reason from previous attempts
             return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
                                       "org.freedesktop.NetworkManager", "ActivateConnection",
@@ -1340,7 +1337,7 @@ export function NetworkManagerModel() {
                     .then(([active_connection]) => active_connection);
         }
 
-        activate_with_settings(settings, specific_object) {
+        activate_with_settings(settings, specific_object: NMObject) {
             priv(this).lastFailureReason = undefined; // Clear stale failure reason from previous attempts
             try {
                 return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
@@ -1385,10 +1382,10 @@ export function NetworkManagerModel() {
         // Wait for a connection to complete
         // For WiFi, pass expected_ssid to verify we connected to the right network
         // Returns a Promise that resolves on success or cancel, rejects with {reason} on failure
-        wait_connection(expected_ssid) {
+        wait_connection(expected_ssid: string) {
             priv(this).connectionCancelled = false;
             utils.debug("wait_connection: starting, iface:", this.Interface, "expected:", expected_ssid, "initial state:", this.State);
-            return new Promise((resolve, reject) => {
+            return new Promise<void>((resolve, reject) => {
                 let activationStarted = false;
 
                 const cleanup = () => self.removeEventListener("changed", check);
@@ -1457,7 +1454,7 @@ export function NetworkManagerModel() {
         }
     }
 
-    const type_Device = Device;
+    const type_Device = NMDevice;
 
     // The 'Interface' type does not correspond to any NetworkManager
     // object or interface.  We use it to represent a network device
@@ -1467,11 +1464,11 @@ export function NetworkManagerModel() {
     // This is a HACK: NetworkManager should export Device nodes for
     // these.
 
-    class Interface extends NMObject {
+    class NMInterface extends NMObject implements NetworkInterface {
         static readonly interfaces: string[] = [];
 
         static readonly exporters = [
-            function (obj) {
+            function (obj: NetworkInterface) {
                 obj.Device = null;
                 obj._NonDeviceConnections = [];
                 obj.Connections = [];
@@ -1487,13 +1484,13 @@ export function NetworkManagerModel() {
             //        type_Interface.Connections
             //        type_Interface.MainConnection
 
-            function (obj) {
+            function (obj: NetworkInterface) {
                 if (!obj.Device && obj._NonDeviceConnections.length === 0) {
                     drop_object(priv(obj).path);
                     return;
                 }
 
-                function consider_for_main(con) {
+                function consider_for_main(con: Connection) {
                     if (!obj.MainConnection ||
                         connection_settings(obj.MainConnection).timestamp < connection_settings(con).timestamp) {
                         obj.MainConnection = con;
@@ -1526,14 +1523,19 @@ export function NetworkManagerModel() {
             }
         ];
 
+        Name: string = "";
+        Device: Device | null = null;
+        _NonDeviceConnections: Connection[] = [];
+        Connections: Connection[] = [];
+        MainConnection: Connection | null = null;
+
         constructor(path: string) {
             super()
-            this[' priv'] = { type: Interface, path };
-            console.log("CTOR INTERFACE");
+            this[' priv'] = { type: NMInterface, path };
         }
     }
 
-    const type_Interface = Interface;
+    const type_Interface = NMInterface;
 
     function get_interface(iface) {
         const obj = get_object(":interface:" + iface, type_Interface);
@@ -1545,7 +1547,7 @@ export function NetworkManagerModel() {
         return peek_object(":interface:" + iface);
     }
 
-    class Settings extends NMObject {
+    class NMSettingsManager extends NMObject implements SettingsManager {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.Settings"
         ];
@@ -1559,7 +1561,7 @@ export function NetworkManagerModel() {
 
             // Sets: type_Interface._NonDeviceConnections
             //
-            function (obj) {
+            function (obj: SettingsManager) {
                 if (obj.Connections) {
                     obj.Connections.forEach(function (con) {
                         function add_to_interface(name) {
@@ -1590,7 +1592,7 @@ export function NetworkManagerModel() {
         [key: string]: any;
         constructor(path: string) {
             super()
-            this[' priv'] = { type: Settings, path };
+            this[' priv'] = { type: NMSettingsManager, path };
         }
 
         add_connection(conf) {
@@ -1602,14 +1604,14 @@ export function NetworkManagerModel() {
         }
     }
 
-    const type_Settings = Settings;
+    const type_Settings = NMSettingsManager;
 
-    class Manager {
+    class NMManager extends NMObject implements Manager {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager"
         ];
 
-        static readonly props: Record<string, any> = {
+        static readonly props: Partial<Record<keyof Manager, any>> = {
             Capabilities: { def: [] },
             Version: { },
             Devices: {
@@ -1638,9 +1640,10 @@ export function NetworkManagerModel() {
         [key: string]: any;
 
         constructor(path: string) {
-            this[' priv'] = { type: Manager, path };
-            for (const p in Manager.props)
-                this[p] = Manager.props[p].def;
+            super()
+            this[' priv'] = { type: NMManager, path };
+            for (const p in NMManager.props)
+                this[p] = NMManager.props[p].def;
         }
 
         checkpoint_create(devices, timeout) {
@@ -1680,7 +1683,7 @@ export function NetworkManagerModel() {
         }
     }
 
-    const type_Manager = Manager;
+    const type_Manager = NMManager;
 
     /* Now create the cyclic declarations.
      */
