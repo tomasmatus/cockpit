@@ -97,6 +97,21 @@ export function connection_settings(c: Connection | null | undefined): Connectio
     }
 }
 
+class NMObject {
+    ' priv': {
+        path: string,
+        type: any,
+    }
+
+    // set as 'any' here, subclasses override it
+    static readonly refresh?: (obj: any) => void;
+    static readonly exporters?: Array<((obj: any) => void) | null>;
+
+    constructor() {
+        console.log("CONSTRUCTING");
+    }
+}
+
 /* NetworkManagerModel
  *
  * The NetworkManager model maintains a mostly-read-only data
@@ -249,7 +264,7 @@ export function NetworkManagerModel() {
         };
     }
 
-    function priv(obj) {
+    function priv<T extends NMObject>(obj: T): NMObject[' priv'] {
         return obj[' priv'];
     }
 
@@ -265,24 +280,25 @@ export function NetworkManagerModel() {
             export_model();
     }
 
-    function get_object(path, type) {
+    function get_object<T extends NMObject>(path: string, type: (new (path: string) => T) & typeof NMObject): T | null {
         if (path == "/")
             return null;
         if (!objects[path]) {
-            objects[path] = new type(path);
+            const asd = new type(path);
+            objects[path] = asd;
             if (type.refresh)
                 type.refresh(objects[path]);
             if (type.exporters && type.exporters[0])
                 type.exporters[0](objects[path]);
         }
-        return objects[path];
+        return objects[path] as T;
     }
 
-    function peek_object(path) {
+    function peek_object(path: string): NMObject | null {
         return objects[path] || null;
     }
 
-    function drop_object(path) {
+    function drop_object(path: string) {
         const obj = objects[path];
         if (obj) {
             if (priv(obj).type.drop)
@@ -993,17 +1009,6 @@ export function NetworkManagerModel() {
      * code and using the data conversion functions.
      */
 
-    class NMObject {
-        ' priv': {
-            path: string,
-            type: any,
-        }
-
-        constructor() {
-            console.log("CONSTRUCTING");
-        }
-    }
-
     class NMIpv4Config extends NMObject implements Ipv4Config {
         static readonly interfaces = [
             "org.freedesktop.NetworkManager.IP4Config"
@@ -1538,7 +1543,7 @@ export function NetworkManagerModel() {
 
     const type_Interface = NMInterface;
 
-    function get_interface(iface) {
+    function get_interface(iface: string) {
         const obj = get_object(":interface:" + iface, type_Interface);
         obj.Name = iface;
         return obj;
@@ -1628,7 +1633,7 @@ export function NetworkManagerModel() {
 
             // Sets: type_Interface.Device
             //
-            function (obj) {
+            function (obj: Manager) {
                 obj.Devices.forEach(function (dev) {
                     console.log(dev);
                     if (dev.Interface) {
