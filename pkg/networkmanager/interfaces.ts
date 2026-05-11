@@ -27,6 +27,7 @@ import type {
     Settings,
     NMSettingsManager,
     SettingsManager,
+    NMSettings,
 } from './types';
 
 import "./networking.scss";
@@ -1160,8 +1161,8 @@ export function NetworkManagerModel() {
             }
         ];
 
-        Unsaved = false;
-        Settings: any = null;
+        Unsaved: boolean = false;
+        Settings: NMSettings | null = null;
         Groups: Connection[] = [];
         Members: Connection[] = [];
         Interfaces: NetworkInterface[] = [];
@@ -1221,7 +1222,7 @@ export function NetworkManagerModel() {
         Ip4Config: Ipv4Config | null = null;
         Ip6Config: Ipv6Config | null = null;
         State: number = 0 ;
-        Group: NMDevice | null = null;
+        Group: Device | null = null;
 
         constructor(path: string) {
             super()
@@ -1589,7 +1590,8 @@ export function NetworkManagerModel() {
             }
         ];
 
-        [key: string]: any;
+        Connections: Connection[] = [];
+
         constructor(path: string) {
             super()
             this[' priv'] = { type: NMSettingsManager, path };
@@ -1637,13 +1639,14 @@ export function NetworkManagerModel() {
             }
         ];
 
-        [key: string]: any;
+        Capabilities: number[] = [];
+        Version: string | undefined = undefined;
+        Devices: Device[] = [];
+        ACiveConnections: ActiveConnection[] = [];
 
         constructor(path: string) {
             super()
             this[' priv'] = { type: NMManager, path };
-            for (const p in NMManager.props)
-                this[p] = NMManager.props[p].def;
         }
 
         checkpoint_create(devices, timeout) {
@@ -1687,6 +1690,7 @@ export function NetworkManagerModel() {
 
     /* Now create the cyclic declarations.
      */
+    // TODO: cyclic declarations
     type_ActiveConnection.props.Group = { conv: conv_Object(type_Device) };
     // type_Device.props.Members = { conv: conv_Array(conv_Object(type_Device)), def: [] };
 

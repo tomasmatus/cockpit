@@ -154,8 +154,8 @@ export interface AccessPoint {
 }
 
 export interface Connection {
-    Unsaved: boolean | undefined;
-    Settings: NMSettings;
+    Unsaved: boolean;
+    Settings: NMSettings | null;
     Groups: Connection[];
     Members: Connection[];
     Interfaces: NetworkInterface[];
@@ -194,9 +194,9 @@ export interface Device {
     Managed: boolean;
     AccessPoints: AccessPoint[];
     ActiveAccessPoint: AccessPoint | null;
-    Members: Device[];
     visibleSsids: AccessPoint[];
     hiddenAPCount: number;
+    Members: Device[];
     activate(connection: Connection | null, specific_object: AccessPoint | null): Promise<string>;
     activate_with_settings(settings: NMSettings, specific_object?: AccessPoint | null): Promise<{ connection: Connection; active_connection: ActiveConnection }>;
     disconnect(): Promise<void>;
