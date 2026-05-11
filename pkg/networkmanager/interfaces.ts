@@ -30,6 +30,7 @@ import type {
     SettingsManager,
     NMSettings,
     CurtainState,
+    NMObjectNewable,
 } from './types';
 
 import "./networking.scss";
@@ -254,15 +255,15 @@ export function NetworkManagerModel(): NMModel {
         console.warn.apply(console, arguments);
     }
 
-    function conv_Object(type) {
-        return function (path) {
+    function conv_Object<T extends NMObject>(type: NMObjectNewable<T> & typeof NMObject) {
+        return function (path: string) {
             return get_object(path, type);
         };
     }
 
-    function conv_Array(conv) {
-        return function (elts) {
-            return elts.map(conv);
+    function conv_Array<T, U>(converter: (item: T) => U): (items: T[]) => U[] {
+        return function (items: T[]) {
+            return items.map(converter);
         };
     }
 
@@ -282,7 +283,7 @@ export function NetworkManagerModel(): NMModel {
             export_model();
     }
 
-    function get_object<T extends NMObject>(path: string, type: (new (path: string) => T) & typeof NMObject): T | null {
+    function get_object<T extends NMObject>(path: string, type: NMObjectNewable<T> & typeof NMObject): T | null {
         if (path == "/")
             return null;
         if (!objects[path]) {
@@ -310,7 +311,7 @@ export function NetworkManagerModel(): NMModel {
         }
     }
 
-    function set_object_properties(obj, props) {
+    function set_object_properties<T extends NMObject>(obj: T, props: any) {
         const decl = priv(obj).type.props;
         for (const p in decl) {
             let val = props[decl[p].prop || p];
@@ -336,14 +337,14 @@ export function NetworkManagerModel(): NMModel {
         return props;
     }
 
-    function objpath(obj) {
+    function objpath<T extends NMObject>(obj: T): string {
         if (obj && priv(obj).path)
             return priv(obj).path;
         else
             return "/";
     }
 
-    function call_object_method(obj, iface, method) {
+    function call_object_method<T extends NMObject>(obj: T, iface: string, method: string) {
         return client.call(objpath(obj), iface, method, Array.prototype.slice.call(arguments, 3));
     }
 
