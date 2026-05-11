@@ -24,10 +24,12 @@ import type {
     Ipv6Config,
     Manager,
     NMIPAddress,
+    NMModel,
     Settings,
     NMSettingsManager,
     SettingsManager,
     NMSettings,
+    CurtainState,
 } from './types';
 
 import "./networking.scss";
@@ -177,7 +179,7 @@ class NMObject {
  * In the future this could be rewritten to use DBusProxies.
  */
 
-export function NetworkManagerModel() {
+export function NetworkManagerModel(): NMModel {
     /*
      * The NetworkManager model doesn't need proxies in its DBus client.
      * It uses the 'raw' dbus events and methods and constructs its own data
@@ -187,7 +189,7 @@ export function NetworkManagerModel() {
      * peculiarities of the NetworkManager API.
      */
 
-    const self = this;
+    const self = this as NMModel;
     cockpit.event_target(self);
 
     const client = cockpit.dbus("org.freedesktop.NetworkManager", { superuser: "try" });
@@ -213,7 +215,7 @@ export function NetworkManagerModel() {
     }
 
     /* resolved once first stage of initialization is done */
-    self.preinit = new Promise((resolve, reject) => {
+    self.preinit = new Promise<void>((resolve, _reject) => {
         client.call("/org/freedesktop/NetworkManager",
                     "org.freedesktop.DBus.Properties", "Get",
                     ["org.freedesktop.NetworkManager", "Version"], { flags: "" })
@@ -236,7 +238,7 @@ export function NetworkManagerModel() {
 
     const objects: Record<string, NMObject> = { };
 
-    self.set_curtain = (state) => {
+    self.set_curtain = (state: CurtainState) => {
         self.curtain = state;
         self.dispatchEvent("changed");
     };

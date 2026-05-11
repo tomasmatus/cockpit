@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
+import cockpit from "cockpit";
+
+export type CurtainState = "testing" | "restoring" | undefined;
+
 /* Low-level IP address and route structures used in parsed settings */
 
 export interface NMIPAddress {
@@ -230,4 +234,26 @@ export interface Manager {
     checkpoint_create(devices: Device[], timeout: number): Promise<string | undefined>;
     checkpoint_destroy(checkpoint: string | undefined): Promise<void>;
     checkpoint_rollback(checkpoint: string | undefined): Promise<Record<string, number> | undefined>;
+}
+
+export interface NMModel {
+    client: cockpit.DBusClient;
+    supports_dns_data: boolean;
+    preinit: Promise<void>;
+    ready: boolean | undefined;
+    operationInProgress: boolean | undefined;
+    curtain: CurtainState;
+
+    set_curtain(state: CurtainState): void;
+    set_operation_in_progress(value: boolean): void;
+    synchronize(): Promise<void>;
+    close(): void;
+    list_interfaces(): NetworkInterface[];
+    find_interface(name: string): NetworkInterface | null;
+    get_manager(): Manager | null;
+    get_settings(): SettingsManager | null;
+
+    addEventListener(event: string, handler: (...args: any[]) => void): void;
+    removeEventListener(event: string, handler: (...args: any[]) => void): void;
+    dispatchEvent(event: string): void;
 }
