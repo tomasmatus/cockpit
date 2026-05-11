@@ -350,7 +350,7 @@ export function NetworkManagerModel(): NMModel {
 
     const interface_types = { };
     let max_export_phases = 0;
-    let export_pending;
+    let export_pending = false;
 
     function set_object_types(all_types) {
         all_types.forEach(function (type) {
