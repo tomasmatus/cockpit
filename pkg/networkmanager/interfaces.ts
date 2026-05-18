@@ -540,15 +540,17 @@ export function NetworkManagerModel(): NMModel {
         return route_nm;
     }
 
-    function settings_from_nm(settings) {
-        function get(first, second, def) {
+    function settings_from_nm(settings: NMSettingsDbus) {
+        function get(first: keyof NMSettingsDbus, second: string, def?: any) {
             if (settings[first] && settings[first][second])
                 return settings[first][second].v;
             else
                 return def;
         }
 
-        function get_ip(first, ip_to_text) {
+        type IPconvertFunction = ((data: number, zero_is_empty?: boolean) => string) | ((data: string, zero_is_empty?: boolean) => string);
+
+        function get_ip(first: "ipv4" | "ipv6", ip_to_text: IPconvertFunction): IPConfig {
             const dns_data = self.supports_dns_data
                 ? get(first, "dns-data", [])
                 : get(first, "dns", []).map(ip_to_text);
@@ -565,7 +567,7 @@ export function NetworkManagerModel(): NMModel {
             };
         }
 
-        const result = {
+        const result: NMSettings = {
             connection: {
                 type: get("connection", "type"),
                 uuid: get("connection", "uuid"),
@@ -604,7 +606,7 @@ export function NetworkManagerModel(): NMModel {
             };
         }
 
-        function JSON_parse_carefully(str) {
+        function JSON_parse_carefully(str: string) {
             try {
                 return JSON.parse(str);
             } catch (e) {
