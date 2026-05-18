@@ -134,6 +134,27 @@ export interface NMSettings {
     "802-11-wireless-security"?: WifiSecuritySettings;
 }
 
+/* This is the same interface as NMSettings but keys match what
+ * is actually used on dbus. Cockpit makes some changes to it
+ * for better compatibility with Javascript
+ */
+
+export interface NMSettingsDbus {
+    connection: ConnectionSettings;
+    ipv4?: IPConfig;
+    ipv6?: IPConfig;
+    "802-3-ethernet": EthernetSettings; // NMSettings.ethernet
+    bond?: BondSettings;
+    team?: TeamSettings;
+    "team-port"?: TeamPortSettings; // NMSettings.team_port
+    bridge?: BridgeSettings;
+    "bridge-port"?: BridgePortSettings; // NMSettings.bridge_port
+    vlan?: VlanSettings;
+    wireguard?: WireguardSettings;
+    "802-11-wireless"?: WifiSettings;
+    "802-11-wireless-security"?: WifiSecuritySettings;
+}
+
 /* NetworkManager D-Bus object shapes (correspond to type_* objects in interfaces.ts) */
 
 export interface Ipv4Config {

@@ -17,7 +17,6 @@ import type {
     Connection,
     ConnectionSettings,
     Device,
-    I_Ipv4Config,
     NetworkInterface,
     IPConfig,
     Ipv4Config,
@@ -25,12 +24,11 @@ import type {
     Manager,
     NMIPAddress,
     NMModel,
-    Settings,
-    NMSettingsManager,
     SettingsManager,
     NMSettings,
     CurtainState,
     NMObjectNewable,
+    NMSettingsDbus,
 } from './types';
 
 import "./networking.scss";
@@ -674,10 +672,10 @@ export function NetworkManagerModel(): NMModel {
         return result;
     }
 
-    function settings_to_nm(settings, orig) {
-        const result = JSON.parse(JSON.stringify(orig || { }));
+    function settings_to_nm(settings: NMSettings, orig: NMSettings) {
+        const result: NMSettingsDbus = JSON.parse(JSON.stringify(orig || { }));
 
-        function set(first, second, sig, val, def) {
+        function set(first: keyof NMSettingsDbus, second: string, sig: string, val: any, def?: any) {
             if (val === undefined)
                 val = def;
             if (!result[first])
@@ -688,18 +686,18 @@ export function NetworkManagerModel(): NMModel {
                 delete result[first][second];
         }
 
-        function set_ip(first, dns_ip_sig, ip_from_text) {
-            set(first, "method", 's', settings[first].method);
-            set(first, "ignore-auto-dns", 'b', settings[first].ignore_auto_dns);
-            set(first, "ignore-auto-routes", 'b', settings[first].ignore_auto_routes);
-            set(first, "addr-gen-mode", 'i', settings[first].addr_gen_mode);
+        function set_ip(first: "ipv4" | "ipv6", dns_ip_sig: string, ip_from_text: (text: string, empty_is_zero?: boolean) => number | string) {
+            set(first, "method", 's', settings[first]?.method);
+            set(first, "ignore-auto-dns", 'b', settings[first]?.ignore_auto_dns);
+            set(first, "ignore-auto-routes", 'b', settings[first]?.ignore_auto_routes);
+            set(first, "addr-gen-mode", 'i', settings[first]?.addr_gen_mode);
 
-            const addresses = settings[first].address_data;
+            const addresses = settings[first]?.address_data;
             if (addresses)
                 set(first, "address-data", "aa{sv}", addresses.map(addr => ip_address_to_nm(addr, first)));
 
-            const gateway = settings[first].gateway;
-            if (gateway && addresses.length > 0) {
+            const gateway = settings[first]?.gateway;
+            if (gateway && addresses && addresses.length > 0) {
                 if (!utils.validate_ip(gateway)) {
                     throw cockpit.format(_("Invalid gateway address: $0"), gateway);
                 }
@@ -709,7 +707,7 @@ export function NetworkManagerModel(): NMModel {
                 delete result[first].gateway;
             }
 
-            const dns = settings[first].dns_data;
+            const dns = settings[first]?.dns_data;
             if (dns) {
                 const invalid = dns.find(addr => !utils.validate_ip(addr));
                 if (invalid) {
@@ -723,9 +721,9 @@ export function NetworkManagerModel(): NMModel {
                 }
             }
 
-            set(first, "dns-search", 'as', settings[first].dns_search);
+            set(first, "dns-search", 'as', settings[first]?.dns_search);
 
-            const routes = settings[first].route_data;
+            const routes = settings[first]?.route_data;
             if (routes)
                 set(first, "route-data", "aa{sv}", routes.map(route => route_to_nm(route, first)));
 
@@ -950,7 +948,7 @@ export function NetworkManagerModel(): NMModel {
         }
     }
 
-    const connections_by_uuid = { };
+    const connections_by_uuid: Record<string, Connection> = { };
 
     function set_settings(obj, settings) {
         if (obj.Settings && obj.Settings.connection && obj.Settings.connection.uuid)
@@ -1154,7 +1152,7 @@ export function NetworkManagerModel(): NMModel {
                 }
 
                 const cs = connection_settings(obj);
-                if (cs.member_type) {
+                if (cs.member_type && cs.group) {
                     const group = connections_by_uuid[cs.group];
                     if (group) {
                         obj.Groups.push(group);
@@ -1185,7 +1183,7 @@ export function NetworkManagerModel(): NMModel {
             return JSON.parse(JSON.stringify(this.Settings));
         }
 
-        apply_settings(settings) {
+        apply_settings(settings: NMSettings) {
             try {
                 return call_object_method(this,
                                           "org.freedesktop.NetworkManager.Settings.Connection", "Update",
@@ -1198,7 +1196,7 @@ export function NetworkManagerModel(): NMModel {
             }
         }
 
-        activate(dev, specific_object) {
+        activate(dev: Device | null, specific_object: AccessPoint | null): Promise<string> {
             return call_object_method(get_object("/org/freedesktop/NetworkManager", type_Manager),
                                       "org.freedesktop.NetworkManager", "ActivateConnection",
                                       objpath(this), objpath(dev), objpath(specific_object))
@@ -1552,8 +1550,8 @@ export function NetworkManagerModel(): NMModel {
         return obj;
     }
 
-    function peek_interface(iface) {
-        return peek_object(":interface:" + iface);
+    function peek_interface(iface: string): NMInterface | null {
+        return peek_object(":interface:" + iface) as NMInterface | null;
     }
 
     class NMSettingsManager extends NMObject implements SettingsManager {
