@@ -1318,7 +1318,7 @@ export function NetworkManagerModel(): NMModel {
         ActiveConnection: ActiveConnection | null = null;
         Ip4Config: Ipv4Config | null = null;
         Ip6Config: Ipv6Config | null = null;
-        Udi: string | null = null;
+        Udi: string = "";
         IdVendor: string = "";
         IdModel: string = "";
         Driver: string = "";

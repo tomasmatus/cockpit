@@ -212,7 +212,7 @@ export interface Device {
     ActiveConnection: ActiveConnection | null;
     Ip4Config: Ipv4Config | null;
     Ip6Config: Ipv6Config | null;
-    Udi: string | null;
+    Udi: string;
     IdVendor: string;
     IdModel: string;
     Driver: string;
