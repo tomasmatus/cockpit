@@ -342,15 +342,15 @@ export function NetworkManagerModel(): NMModel {
             return "/";
     }
 
-    function call_object_method<T extends NMObject>(obj: T, iface: string, method: string) {
-        return client.call(objpath(obj), iface, method, Array.prototype.slice.call(arguments, 3));
+    function call_object_method<T extends NMObject>(obj: T, iface: string, method: string, ...args: any[]) {
+        return client.call(objpath(obj), iface, method, Array.prototype.slice.call(args, 3));
     }
 
     const interface_types = { };
     let max_export_phases = 0;
     let export_pending = false;
 
-    function set_object_types(all_types) {
+    function set_object_types<T extends NMObject>(all_types: T[]) {
         all_types.forEach(function (type) {
             if (type.exporters && type.exporters.length > max_export_phases)
                 max_export_phases = type.exporters.length;
@@ -360,7 +360,8 @@ export function NetworkManagerModel(): NMModel {
         });
     }
 
-    function signal_emitted(path, iface, signal, args) {
+
+    function signal_emitted(path: string, iface: string, signal: string, ...args: unknown[]) {
         const obj = peek_object(path);
 
         if (obj) {
@@ -376,7 +377,7 @@ export function NetworkManagerModel(): NMModel {
         }
     }
 
-    function interface_properties(path, iface, props) {
+    function interface_properties(path: string, iface: string, props) {
         const type = interface_types[iface];
         if (type)
             set_object_properties(get_object(path, type), props);
@@ -862,7 +863,7 @@ export function NetworkManagerModel(): NMModel {
         return result;
     }
 
-    function device_type_to_symbol(type) {
+    function device_type_to_symbol(type: number) {
         // This returns a string that is suitable for the connection.type field of
         // Connection.Settings, except for "ethernet".
         switch (type) {
@@ -903,7 +904,7 @@ export function NetworkManagerModel(): NMModel {
         }
     }
 
-    function device_state_to_text(state) {
+    function device_state_to_text(state: number) {
         switch (state) {
         // NM_DEVICE_STATE_UNKNOWN
         case 0: return "?";
@@ -935,7 +936,7 @@ export function NetworkManagerModel(): NMModel {
         }
     }
 
-    function access_point_mode_to_text(mode) {
+    function access_point_mode_to_text(mode: number) {
         switch (mode) {
         // NM_802_11_MODE_ADHOC
         case 1: return _("Adhoc");
@@ -952,7 +953,7 @@ export function NetworkManagerModel(): NMModel {
 
     const connections_by_uuid: Record<string, Connection> = { };
 
-    function set_settings(obj, settings) {
+    function set_settings(obj: Connection, settings: NMSettings | null) {
         if (obj.Settings && obj.Settings.connection && obj.Settings.connection.uuid)
             delete connections_by_uuid[obj.Settings.connection.uuid];
         obj.Settings = settings;
@@ -960,7 +961,7 @@ export function NetworkManagerModel(): NMModel {
             connections_by_uuid[settings.connection.uuid] = obj;
     }
 
-    function refresh_settings(obj) {
+    function refresh_settings(obj: Connection) {
         push_refresh();
         client.call(objpath(obj), "org.freedesktop.NetworkManager.Settings.Connection", "GetSettings")
                 .then(function(reply) {
@@ -974,7 +975,7 @@ export function NetworkManagerModel(): NMModel {
                 .finally(pop_refresh);
     }
 
-    function refresh_udev(obj) {
+    function refresh_udev(obj: Device) {
         if (obj.Udi.indexOf("/sys/") !== 0)
             return;
 
@@ -1004,7 +1005,7 @@ export function NetworkManagerModel(): NMModel {
                 .finally(pop_refresh);
     }
 
-    function handle_updated(obj) {
+    function handle_updated(obj: Connection) {
         refresh_settings(obj);
     }
 
