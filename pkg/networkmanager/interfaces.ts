@@ -966,7 +966,7 @@ export function NetworkManagerModel(): NMModel {
             connections_by_uuid[settings.connection.uuid] = obj;
     }
 
-    function refresh_settings(obj: Connection) {
+    function refresh_settings(obj: NMConnection) {
         push_refresh();
         client.call(objpath(obj), "org.freedesktop.NetworkManager.Settings.Connection", "GetSettings")
                 .then(function(reply) {
@@ -988,7 +988,7 @@ export function NetworkManagerModel(): NMModel {
         cockpit.spawn(["udevadm", "info", obj.Udi], { err: 'message' })
                 .then(function(res) {
                     const props = { };
-                    function snarf_prop(line, env, prop) {
+                    function snarf_prop(line: string, env: string, prop: string) {
                         const prefix = "E: " + env + "=";
                         if (line.indexOf(prefix) === 0) {
                             props[prop] = line.substring(prefix.length);
@@ -1010,7 +1010,7 @@ export function NetworkManagerModel(): NMModel {
                 .finally(pop_refresh);
     }
 
-    function handle_updated(obj: Connection) {
+    function handle_updated(obj: NMConnection) {
         refresh_settings(obj);
     }
 
