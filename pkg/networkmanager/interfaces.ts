@@ -27,7 +27,6 @@ import type {
     SettingsManager,
     NMSettings,
     CurtainState,
-    NMObjectNewable,
     NMSettingsDbus,
 } from './types';
 
@@ -97,6 +96,13 @@ export function connection_settings(c: Connection | null | undefined): Connectio
         return { };
     }
 }
+
+type NMObjectConstructor<T extends NMObject> = {
+    new(path: string): T;
+    readonly refresh?: (obj: any) => void;
+    readonly exporters?: Array<((obj: any) => void) | null>;
+    readonly interfaces: string[];
+};
 
 class NMObject {
     ' priv': {
@@ -254,7 +260,7 @@ export function NetworkManagerModel(): NMModel {
         console.warn.apply(console, arguments);
     }
 
-    function conv_Object<T extends NMObject>(type: NMObjectNewable<T> & typeof NMObject) {
+    function conv_Object<T extends NMObject>(type: NMObjectConstructor<T>) {
         return function (path: string) {
             return get_object(path, type);
         };
@@ -282,7 +288,7 @@ export function NetworkManagerModel(): NMModel {
             export_model();
     }
 
-    function get_object<T extends NMObject>(path: string, type: NMObjectNewable<T> & typeof NMObject): T | null {
+    function get_object<T extends NMObject>(path: string, type: NMObjectConstructor<T>): T | null {
         if (path == "/")
             return null;
         if (!objects[path]) {
@@ -351,7 +357,7 @@ export function NetworkManagerModel(): NMModel {
     let max_export_phases = 0;
     let export_pending = false;
 
-    function set_object_types<T extends NMObject>(all_types: (NMObjectNewable<T> & typeof NMObject)[]) {
+    function set_object_types<T extends NMObject>(all_types: (NMObjectConstructor<T>)[]) {
         all_types.forEach(function (type) {
             if (type.exporters && type.exporters.length > max_export_phases)
                 max_export_phases = type.exporters.length;

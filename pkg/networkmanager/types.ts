@@ -7,8 +7,6 @@ import cockpit from "cockpit";
 
 export type CurtainState = "testing" | "restoring" | undefined;
 
-export type NMObjectNewable<T> = new (path: string) => T
-
 /* Low-level IP address and route structures used in parsed settings */
 
 export interface NMIPAddress {
