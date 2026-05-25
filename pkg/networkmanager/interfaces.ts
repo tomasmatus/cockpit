@@ -107,6 +107,7 @@ class NMObject {
     // set as 'any' here, subclasses override it
     static readonly refresh?: (obj: any) => void;
     static readonly exporters?: Array<((obj: any) => void) | null>;
+    static readonly interfaces: string[];
 
     constructor() {
         console.log("CONSTRUCTING");
@@ -346,11 +347,11 @@ export function NetworkManagerModel(): NMModel {
         return client.call(objpath(obj), iface, method, Array.prototype.slice.call(args, 3));
     }
 
-    const interface_types = { };
+    const interface_types: Record<string, typeof NMObject> = { };
     let max_export_phases = 0;
     let export_pending = false;
 
-    function set_object_types<T extends NMObject>(all_types: T[]) {
+    function set_object_types<T extends NMObject>(all_types: (NMObjectNewable<T> & typeof NMObject)[]) {
         all_types.forEach(function (type) {
             if (type.exporters && type.exporters.length > max_export_phases)
                 max_export_phases = type.exporters.length;
