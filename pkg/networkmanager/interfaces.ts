@@ -1712,7 +1712,7 @@ export function NetworkManagerModel(): NMModel {
      */
 
     self.list_interfaces = function list_interfaces() {
-        const result = [];
+        const result: NetworkInterface[] = [];
         for (const path in objects) {
             const obj = objects[path];
             if (priv(obj).type === type_Interface)
