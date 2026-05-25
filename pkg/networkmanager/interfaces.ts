@@ -378,10 +378,14 @@ export function NetworkManagerModel(): NMModel {
         }
     }
 
-    function interface_properties(path: string, iface: string, props) {
+    function interface_properties(path: string, iface: string, props: any) {
         const type = interface_types[iface];
-        if (type)
-            set_object_properties(get_object(path, type), props);
+        if (type) {
+            const obj = get_object(path, type);
+            if (obj) {
+                set_object_properties(obj, props);
+            }
+        }
     }
 
     function interface_removed(path, iface) {
@@ -389,7 +393,7 @@ export function NetworkManagerModel(): NMModel {
         drop_object(path);
     }
 
-    let export_model_promise = null;
+    let export_model_promise: Promise<void> | null = null;
     let export_model_promise_resolve = null;
 
     function export_model() {
