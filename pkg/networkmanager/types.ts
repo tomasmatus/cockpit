@@ -254,9 +254,10 @@ export interface Manager {
     Version: string | undefined;
     Devices: Device[];
     ActiveConnections: ActiveConnection[];
-    checkpoint_create(devices: Device[], timeout: number): Promise<string | undefined>;
+    // TODO: check return types if promise is successful
+    checkpoint_create(devices: Device[], timeout: number): Promise<unknown>;
     checkpoint_destroy(checkpoint: string | undefined): Promise<void>;
-    checkpoint_rollback(checkpoint: string | undefined): Promise<Record<string, number> | undefined>;
+    checkpoint_rollback(checkpoint: string | undefined): Promise<unknown>;
 }
 
 export interface NMModel {

@@ -1663,7 +1663,7 @@ export function NetworkManagerModel(): NMModel {
             this[' priv'] = { type: NMManager, path };
         }
 
-        checkpoint_create(devices, timeout) {
+        checkpoint_create(devices: Device[], timeout: number) {
             return call_object_method(this,
                                       'org.freedesktop.NetworkManager',
                                       'CheckpointCreate',
@@ -1677,7 +1677,7 @@ export function NetworkManagerModel(): NMModel {
                     });
         }
 
-        checkpoint_destroy(checkpoint) {
+        checkpoint_destroy(checkpoint: string | undefined) {
             if (checkpoint) {
                 return call_object_method(this,
                                           'org.freedesktop.NetworkManager',
@@ -1688,7 +1688,7 @@ export function NetworkManagerModel(): NMModel {
                 return Promise.resolve();
         }
 
-        checkpoint_rollback(checkpoint) {
+        checkpoint_rollback(checkpoint: string | undefined) {
             if (checkpoint) {
                 return call_object_method(this,
                                           'org.freedesktop.NetworkManager',
