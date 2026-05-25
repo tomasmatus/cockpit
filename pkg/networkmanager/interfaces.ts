@@ -388,7 +388,7 @@ export function NetworkManagerModel(): NMModel {
         }
     }
 
-    function interface_removed(path, iface) {
+    function interface_removed(path: string) {
         /* For NetworkManager we can make this assumption */
         drop_object(path);
     }
@@ -460,7 +460,7 @@ export function NetworkManagerModel(): NMModel {
                 if (props)
                     interface_properties(path, iface, props);
                 else
-                    interface_removed(path, iface);
+                    interface_removed(path);
             });
         });
     }
