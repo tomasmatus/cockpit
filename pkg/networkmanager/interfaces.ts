@@ -206,7 +206,7 @@ export function NetworkManagerModel(): NMModel {
     // dns-data property was added in version 1.42.0
     self.supports_dns_data = false;
 
-    function check_version_dns_data_support(version) {
+    function check_version_dns_data_support(version: number[]) {
         if (version.length < 2) {
             return false;
         }
@@ -255,9 +255,9 @@ export function NetworkManagerModel(): NMModel {
         self.dispatchEvent("changed");
     };
 
-    function complain() {
+    function complain(...args: Parameters<typeof console.warn>) {
         self.ready = false;
-        console.warn.apply(console, arguments);
+        console.warn.apply(console, args);
     }
 
     function conv_Object<T extends NMObject>(type: NMObjectConstructor<T>) {
