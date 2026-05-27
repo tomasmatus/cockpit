@@ -1711,7 +1711,7 @@ export function NetworkManagerModel(): NMModel {
      */
     // TODO: cyclic declarations
     type_ActiveConnection.props.Group = { conv: conv_Object(type_Device) };
-    // type_Device.props.Members = { conv: conv_Array(conv_Object(type_Device)), def: [] };
+    type_Device.props.Members = { conv: conv_Array(conv_Object(type_Device)), def: [] };
 
     /* Accessing the model.
      */
