@@ -1650,7 +1650,6 @@ export function NetworkManagerModel(): NMModel {
             //
             function (obj: Manager) {
                 obj.Devices.forEach(function (dev) {
-                    console.log(dev);
                     if (dev.Interface) {
                         const iface = get_interface(dev.Interface);
                         iface.Device = dev;
@@ -1758,7 +1757,7 @@ export function NetworkManagerModel(): NMModel {
     self.ready = undefined;
     self.operationInProgress = undefined;
     self.curtain = undefined;
-    console.log(objects);
+    console.log("ALL OBJECTS", objects);
     return self;
 }
 
@@ -1772,7 +1771,7 @@ export function syn_click(model: NMModel, fun: (...args: unknown[]) => unknown) 
     };
 }
 
-export function is_managed(dev: NMDevice): boolean {
+export function is_managed(dev: Device): boolean {
     // Never let the user manage loopback devices, nothing good can come from that.
     return dev.State != 10 && dev.DeviceType != "loopback" && dev.Interface != "lo";
 }
@@ -1784,7 +1783,7 @@ export function is_managed(dev: NMDevice): boolean {
 //     </Button>;
 // }
 
-export function device_state_text(dev: NMDevice | null | undefined): string {
+export function device_state_text(dev: Device | null | undefined): string {
     if (!dev)
         return _("Inactive");
     if (dev.State == 100 && dev.Carrier === false)
@@ -1808,7 +1807,7 @@ export function array_join<T>(elts: T[], sep: T): T[] {
     return result;
 }
 
-export function render_active_connection(dev: NMDevice | null | undefined, with_link: boolean, hide_link_local: boolean) {
+export function render_active_connection(dev: Device | null | undefined, with_link: boolean, hide_link_local: boolean) {
     const parts = [];
 
     if (!dev)
@@ -1848,7 +1847,7 @@ export function render_active_connection(dev: NMDevice | null | undefined, with_
 /* Resource usage monitoring
 */
 
-export function complete_settings(settings: NMConnectionSettings, device: NMDevice | null | undefined): void {
+export function complete_settings(settings: NMSettings, device: Device | null | undefined): void {
     if (!device) {
         console.warn("No device to complete settings", JSON.stringify(settings));
         return;
@@ -1867,7 +1866,7 @@ export function complete_settings(settings: NMConnectionSettings, device: NMDevi
     }
 }
 
-export function settings_applier(model: NMModel, device: NMDevice | null | undefined, connection: NMConnection | null | undefined) {
+export function settings_applier(model: NMModel, device: Device | null | undefined, connection: Connection | null | undefined) {
     /* If we have a connection, we can just update it.
      * Otherwise if the settings has TYPE set, we can add
      * them as a stand-alone object.  Otherwise, we
@@ -1886,7 +1885,7 @@ export function settings_applier(model: NMModel, device: NMDevice | null | undef
 
     const specialCon = utils.isNonPersistentMultiCon(connection);
 
-    return function (settings: NMConnectionSettings) {
+    return function (settings: NMSettings) {
         if (connection && !specialCon) {
             return connection.apply_settings(settings);
         } else if (settings.connection.type && !specialCon) {
@@ -2004,7 +2003,7 @@ const rollback_time = 7.0;
 
 interface CheckpointOptions {
     hack_does_add_or_remove?: boolean;
-    devices?: NMDevice[];
+    devices?: Device[];
     rollback_on_failure?: boolean;
     fail_text?: string;
     anyway_text?: string;
@@ -2118,7 +2117,7 @@ export function with_settings_checkpoint(model: NMModel, modify: () => Promise<v
                     });
 }
 
-export function connection_devices(con: NMConnection | null | undefined): NMDevice[] {
+export function connection_devices(con: Connection | null | undefined): Device[] {
     const devices = [];
 
     if (con)
@@ -2127,25 +2126,25 @@ export function connection_devices(con: NMConnection | null | undefined): NMDevi
     return devices;
 }
 
-export function is_interface_connection(iface: NMInterface, connection: NMConnection | null | undefined): boolean {
+export function is_interface_connection(iface: NetworkInterface, connection: Connection | null | undefined): boolean {
     return connection && connection.Interfaces.indexOf(iface) != -1;
 }
 
-export function is_interesting_interface(iface: NMInterface): boolean {
+export function is_interesting_interface(iface: NetworkInterface): boolean {
     return !iface.Device || is_managed(iface.Device);
 }
 
-export function member_connection_for_interface(group: NMConnection | null | undefined, iface: NMInterface): NMConnection | undefined {
+export function member_connection_for_interface(group: Connection | null | undefined, iface: NetworkInterface): Connection | undefined {
     return group?.Members.find(s => is_interface_connection(iface, s));
 }
 
-export function member_interface_choices(model: NMModel, group: NMConnection | null | undefined): NMInterface[] {
+export function member_interface_choices(model: NMModel, group: Connection | null | undefined): NetworkInterface[] {
     return model.list_interfaces().filter(function (iface) {
         return !is_interface_connection(iface, group) && is_interesting_interface(iface);
     });
 }
 
-export function free_member_connection(con: NMConnection): Promise<void> | undefined {
+export function free_member_connection(con: Connection): Promise<void> | undefined {
     const cs = connection_settings(con);
     if (cs.member_type) {
         delete cs.member_type;
@@ -2156,7 +2155,7 @@ export function free_member_connection(con: NMConnection): Promise<void> | undef
     }
 }
 
-export function set_member(model: NMModel, group_connection: NMConnection | null | undefined, group_settings: NMConnectionSettings, member_type: string,
+export function set_member(model: NMModel, group_connection: Connection | null | undefined, group_settings: ConnectionSettings, member_type: string,
     iface_name: string, val: boolean) {
     const iface = model.find_interface(iface_name);
     if (!iface)
@@ -2227,7 +2226,7 @@ export function set_member(model: NMModel, group_connection: NMConnection | null
     return true;
 }
 
-export function apply_group_member(choices: Record<string, boolean>, model: NMModel, apply_group: (settings: NMConnectionSettings) => Promise<void>, group_connection: NMConnection | null | undefined, group_settings: NMConnectionSettings, member_type: string) {
+export function apply_group_member(choices: Record<string, boolean>, model: NMModel, apply_group: (settings: NMSettings) => Promise<void>, group_connection: Connection | null | undefined, group_settings: ConnectionSettings, member_type: string) {
     const active_settings = [];
 
     if (!group_connection) {
