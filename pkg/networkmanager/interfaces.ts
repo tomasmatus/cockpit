@@ -1030,7 +1030,7 @@ export function NetworkManagerModel(): NMModel {
         ];
 
         static readonly props: Partial<Record<keyof Ipv4Config, any>> = {
-            AddressData: { conv: conv_Array(ip_address_from_nm), def: [] }
+            AddressData: { conv: conv_Array(ip_address_from_nm) }
         };
 
         AddressData: NMIPAddress[] = [];
@@ -1049,7 +1049,7 @@ export function NetworkManagerModel(): NMModel {
         ];
 
         static readonly props: Record<keyof Ipv6Config, any> = {
-            AddressData: { conv: conv_Array(ip_address_from_nm), def: [] }
+            AddressData: { conv: conv_Array(ip_address_from_nm) }
         };
 
         AddressData: NMIPAddress[] = [];
@@ -1068,17 +1068,17 @@ export function NetworkManagerModel(): NMModel {
         ];
 
         static readonly props: Partial<Record<keyof AccessPoint, any>> = {
-            Flags: { def: 0 },
-            WpaFlags: { def: 0 },
-            RsnFlags: { def: 0 },
-            Ssid: { conv: utils.ssid_from_nm, def: "" },
-            Frequency: { def: 0 }, // MHz
-            HwAddress: { def: "" },
-            Mode: { conv: access_point_mode_to_text, def: "" },
-            MaxBitrate: { def: 0 }, // Kbit/s
-            Bandwidth: { def: 0 }, // MHz
-            Strength: { def: 0 },
-            LastSeen: { def: -1 }, // CLOCK_BOOTTIME seconds, -1 if never seen
+            Flags: {},
+            WpaFlags: {},
+            RsnFlags: {},
+            Ssid: { conv: utils.ssid_from_nm },
+            Frequency: {}, // MHz
+            HwAddress: {},
+            Mode: { conv: access_point_mode_to_text },
+            MaxBitrate: {}, // Kbit/s
+            Bandwidth: {}, // MHz
+            Strength: {},
+            LastSeen: {}, // CLOCK_BOOTTIME seconds, -1 if never seen
         };
 
         static readonly exporters = [
@@ -1234,7 +1234,7 @@ export function NetworkManagerModel(): NMModel {
             Connection: { conv: conv_Object(type_Connection) },
             Ip4Config: { conv: conv_Object(type_Ipv4Config) },
             Ip6Config: { conv: conv_Object(type_Ipv6Config) },
-            State: { def: 0 }
+            State: {}
             // See below for "Group"
         };
 
@@ -1272,17 +1272,27 @@ export function NetworkManagerModel(): NMModel {
 
         static props: Partial<Record<keyof NMDevice, any>> = {
             DeviceType: { conv: device_type_to_symbol },
+            Interface: { },
             StateText: { prop: "State", conv: device_state_to_text },
+            State: {},
+            StateReason: {},
+            HwAddress: {},
             AvailableConnections: { conv: conv_Array(conv_Object(type_Connection)) },
             ActiveConnection: { conv: conv_Object(type_ActiveConnection) },
             Ip4Config: { conv: conv_Object(type_Ipv4Config) },
             Ip6Config: { conv: conv_Object(type_Ipv6Config) },
             Udi: { trigger: refresh_udev },
+            IdVendor: {},
+            IdModel: {},
+            Driver: {},
+            Carrier: {},
+            Speed: {},
+            Managed: {},
             // WiFi-specific properties
             AccessPoints: { conv: conv_Array(conv_Object(type_AccessPoint)) },
             ActiveAccessPoint: { conv: conv_Object(type_AccessPoint) },
             // See below for "Members"
-            Members: { conv: conv_Array(conv_Object(NMDevice)), def: [] },
+            Members: { conv: conv_Array(conv_Object(NMDevice)) },
         };
 
         static readonly exporters = [
@@ -1574,7 +1584,7 @@ export function NetworkManagerModel(): NMModel {
         ];
 
         static readonly props: Record<string, any> = {
-            Connections: { conv: conv_Array(conv_Object(type_Connection)), def: [] }
+            Connections: { conv: conv_Array(conv_Object(type_Connection)) }
         };
 
         static readonly exporters = [
@@ -1634,13 +1644,10 @@ export function NetworkManagerModel(): NMModel {
         ];
 
         static readonly props: Partial<Record<keyof Manager, any>> = {
-            Capabilities: { def: [] },
-            Version: { },
-            Devices: {
-                conv: conv_Array(conv_Object(type_Device)),
-                def: []
-            },
-            ActiveConnections: { conv: conv_Array(conv_Object(type_ActiveConnection)), def: [] }
+            Capabilities: {},
+            Version: {},
+            Devices: { conv: conv_Array(conv_Object(type_Device)) },
+            ActiveConnections: { conv: conv_Array(conv_Object(type_ActiveConnection)) }
         };
 
         static readonly exporters = [
