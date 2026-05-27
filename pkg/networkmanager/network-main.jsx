@@ -27,7 +27,7 @@ import {
     device_state_text,
     is_managed,
     render_active_connection,
-} from './interfaces.js';
+} from './interfaces';
 
 const _ = cockpit.gettext;
 
