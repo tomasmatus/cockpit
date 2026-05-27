@@ -1661,7 +1661,7 @@ export function NetworkManagerModel(): NMModel {
         Capabilities: number[] = [];
         Version: string | undefined = undefined;
         Devices: Device[] = [];
-        ACiveConnections: ActiveConnection[] = [];
+        ActiveConnections: ActiveConnection[] = [];
 
         constructor(path: string) {
             super()
