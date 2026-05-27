@@ -2019,8 +2019,8 @@ interface CheckpointOptions {
 export function with_checkpoint(model: NMModel, modify: () => Promise<void>, options: CheckpointOptions): void {
     const manager = model.get_manager();
 
-    let curtain_timeout;
-    let curtain_title_timeout;
+    let curtain_timeout: number | null = null;
+    let curtain_title_timeout: number | null = null;
 
     function show_curtain() {
         cockpit.hint("ignore_transport_health_check", { data: true });
