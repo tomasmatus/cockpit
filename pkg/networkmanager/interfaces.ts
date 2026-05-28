@@ -107,7 +107,7 @@ type NMObjectConstructor<T extends NMObject> = {
 class NMObject {
     ' priv': {
         path: string,
-        type: any,
+        type: NMObjectConstructor<NMObject>,
     }
 
     // set as 'any' here, subclasses override it
