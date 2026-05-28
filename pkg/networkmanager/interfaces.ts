@@ -108,7 +108,7 @@ class NMObject {
     ' priv': {
         path: string,
         type: NMObjectConstructor<NMObject>,
-    }
+    };
 
     // set as 'any' here, subclasses override it
     static readonly refresh?: (obj: any) => void;
@@ -366,7 +366,6 @@ export function NetworkManagerModel(): NMModel {
             });
         });
     }
-
 
     function signal_emitted(path: string, iface: string, signal: string, ...args: unknown[]) {
         const obj = peek_object(path);
@@ -1036,7 +1035,7 @@ export function NetworkManagerModel(): NMModel {
         AddressData: NMIPAddress[] = [];
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMIpv4Config, path };
         }
     }
@@ -1055,7 +1054,7 @@ export function NetworkManagerModel(): NMModel {
         AddressData: NMIPAddress[] = [];
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMIpv6Config, path };
         }
     }
@@ -1106,7 +1105,7 @@ export function NetworkManagerModel(): NMModel {
         Connection: Connection | undefined = undefined;
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMAccessPoint, path };
         }
     }
@@ -1187,9 +1186,8 @@ export function NetworkManagerModel(): NMModel {
         Members: Connection[] = [];
         Interfaces: NetworkInterface[] = [];
 
-
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMConnection, path };
         }
 
@@ -1241,11 +1239,11 @@ export function NetworkManagerModel(): NMModel {
         Connection: Connection | null = null;
         Ip4Config: Ipv4Config | null = null;
         Ip6Config: Ipv6Config | null = null;
-        State: number = 0 ;
+        State: number = 0;
         Group: Device | null = null;
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMActiveConnection, path };
         }
 
@@ -1356,7 +1354,7 @@ export function NetworkManagerModel(): NMModel {
         Members: Device[] = [];
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMDevice, path };
         }
 
@@ -1561,7 +1559,7 @@ export function NetworkManagerModel(): NMModel {
         MainConnection: Connection | null = null;
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMInterface, path };
         }
     }
@@ -1623,7 +1621,7 @@ export function NetworkManagerModel(): NMModel {
         Connections: Connection[] = [];
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMSettingsManager, path };
         }
 
@@ -1671,7 +1669,7 @@ export function NetworkManagerModel(): NMModel {
         ActiveConnections: ActiveConnection[] = [];
 
         constructor(path: string) {
-            super()
+            super();
             this[' priv'] = { type: NMManager, path };
         }
 
