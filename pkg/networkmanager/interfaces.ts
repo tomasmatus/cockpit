@@ -2159,7 +2159,7 @@ export function free_member_connection(con: Connection): Promise<void> | undefin
     }
 }
 
-export function set_member(model: NMModel, group_connection: Connection | null | undefined, group_settings: ConnectionSettings, member_type: string,
+export function set_member(model: NMModel, group_connection: Connection | null | undefined, group_settings: NMSettings, member_type: string,
     iface_name: string, val: boolean) {
     const iface = model.find_interface(iface_name);
     if (!iface)
@@ -2176,7 +2176,7 @@ export function set_member(model: NMModel, group_connection: Connection | null |
             return false;
 
         let member_settings: NMSettings | null = null;
-        if (main_connection) {
+        if (main_connection?.Settings) {
             member_settings = main_connection.Settings;
 
             if (member_settings.connection.group == group_settings.connection.uuid ||
