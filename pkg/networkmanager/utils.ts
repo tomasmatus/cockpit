@@ -316,7 +316,7 @@ export function list_interfaces() {
 // on top of this, remove the multiconnection settings and assign it directly
 // to interface. This is done for Anaconda in order to avoid creating unexpected
 // multiconnections when user modifies the connection during installation.
-export function isNonPersistentMultiCon(connection: Connection): boolean {
+export function isNonPersistentMultiCon(connection: Connection | null | undefined): boolean {
     const settings = connection?.Settings;
     if (settings &&
         settings.connection.interface_name === undefined &&
