@@ -2125,7 +2125,7 @@ export function with_settings_checkpoint(model: NMModel, modify: () => Promise<v
 }
 
 export function connection_devices(con: Connection | null | undefined): Device[] {
-    const devices = [];
+    const devices: Device[] = [];
 
     if (con)
         con.Interfaces.forEach(function (iface) { if (iface.Device) devices.push(iface.Device); });
@@ -2134,7 +2134,7 @@ export function connection_devices(con: Connection | null | undefined): Device[]
 }
 
 export function is_interface_connection(iface: NetworkInterface, connection: Connection | null | undefined): boolean {
-    return connection && connection.Interfaces.indexOf(iface) != -1;
+    return !!connection && connection.Interfaces.indexOf(iface) != -1;
 }
 
 export function is_interesting_interface(iface: NetworkInterface): boolean {
@@ -2178,7 +2178,7 @@ export function set_member(model: NMModel, group_connection: Connection | null |
         if (!group_iface)
             return false;
 
-        let member_settings;
+        let member_settings: NMSettings | null = null;
         if (main_connection) {
             member_settings = main_connection.Settings;
 
