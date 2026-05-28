@@ -38,32 +38,32 @@ export interface IPConfig {
 /* Settings sub-sections returned by settings_from_nm / consumed by settings_to_nm */
 
 export interface ConnectionSettings {
-    type: string | undefined;
-    uuid: string | undefined;
-    interface_name: string | undefined;
+    type?: string;
+    uuid?: string;
+    interface_name?: string;
     timestamp: number;
     id: string;
     autoconnect: boolean;
     autoconnect_priority: number;
     autoconnect_members: number;
-    member_type: string | undefined;
-    group: string | undefined;
-    multi_connect: number | undefined;
+    member_type?: string;
+    group?: string;
+    multi_connect?: number;
 }
 
 export interface EthernetSettings {
-    mtu: number | undefined;
-    assigned_mac_address: string | undefined;
+    mtu?: number;
+    assigned_mac_address?: string;
 }
 
 export interface BondSettings {
     options: Record<string, string>;
-    interface_name: string | undefined;
+    interface_name?: string;
 }
 
 export interface TeamSettings {
     config: object | null;
-    interface_name: string | undefined;
+    interface_name?: string;
 }
 
 export interface TeamPortSettings {
@@ -71,7 +71,7 @@ export interface TeamPortSettings {
 }
 
 export interface BridgeSettings {
-    interface_name: string | undefined;
+    interface_name?: string;
     stp: boolean;
     priority: number;
     forward_delay: number;
@@ -87,9 +87,9 @@ export interface BridgePortSettings {
 }
 
 export interface VlanSettings {
-    parent: string | undefined;
-    id: number | undefined;
-    interface_name: string | undefined;
+    parent?: string;
+    id?: number;
+    interface_name?: string;
 }
 
 export interface WireguardPeer {
@@ -106,12 +106,12 @@ export interface WireguardSettings {
 
 export interface WifiSettings {
     ssid: string | null;
-    mode: string | undefined;
+    mode?: string;
 }
 
 export interface WifiSecuritySettings {
-    "key-mgmt": string | undefined;
-    psk: string | undefined;
+    "key-mgmt"?: string;
+    psk?: string;
 }
 
 /* Top-level settings object, mirroring the result of settings_from_nm */
