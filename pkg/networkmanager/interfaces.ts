@@ -350,7 +350,7 @@ export function NetworkManagerModel(): NMModel {
     }
 
     function call_object_method<T extends NMObject>(obj: T, iface: string, method: string, ...args: any[]) {
-        return client.call(objpath(obj), iface, method, Array.prototype.slice.call(args, 3));
+        return client.call(objpath(obj), iface, method, args);
     }
 
     const interface_types: Record<string, typeof NMObject> = { };
