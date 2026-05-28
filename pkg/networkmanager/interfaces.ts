@@ -1769,11 +1769,10 @@ export function NetworkManagerModel(): NMModel {
 }
 
 export function syn_click(model: NMModel, fun: (...args: unknown[]) => unknown) {
-    return function() {
+    return function(...args: unknown[]) {
         const self = this;
-        const self_args = arguments;
         return model.synchronize().then(function() {
-            fun.apply(self, self_args);
+            fun.apply(self, args);
         });
     };
 }
