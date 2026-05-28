@@ -1814,7 +1814,7 @@ export function array_join<T>(elts: T[], sep: T): T[] {
 }
 
 export function render_active_connection(dev: Device | null | undefined, with_link: boolean, hide_link_local: boolean) {
-    const parts = [];
+    const parts: string[] = [];
 
     if (!dev)
         return "";
