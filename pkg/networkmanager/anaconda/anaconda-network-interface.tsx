@@ -22,6 +22,7 @@ import { useEvent } from "hooks";
 import { active_connection_gateway, active_connection_ipv4, active_connection_ipv6, choice_title, connectInterface, createGhostConnectionSettings, disconnectInterface, is_managed, toggleConnectionAutoconnect, } from "../interfaces";
 import { get_ip_method_choices } from "../ip-settings";
 import { NetworkAction } from "../dialogs-common.jsx";
+import { NMConnectionSettings, NMDevice, NMInterface } from "../utils";
 
 const _ = cockpit.gettext;
 
@@ -37,17 +38,21 @@ interface IPConfigExpandableProps {
     toggleText: string;
     onToggle: any;
     isExpanded: boolean;
-    iface: any;
-    settings: any;
+    iface: NMInterface;
+    settings: NMConnectionSettings;
     topic: IPTopic;
 }
 
 // Get IP config, use what is available on ActiveConnection if the device is up.
 // If it is down only show what we can get from the Connection settings.
-const getIpConfig = (dev, settings, topic: IPTopic) => {
+const getIpConfig = (dev: NMDevice, settings: NMConnectionSettings, topic: IPTopic) => {
     const ipSettings: IpConfig = { addresses: [], gateway: "", dns_data: [] };
     const hasActiveCon = dev.ActiveConnection;
     const params = settings[topic];
+
+    if (!params) {
+        return ipSettings;
+    }
 
     // IP address
     if (hasActiveCon) {
@@ -136,10 +141,10 @@ const IPConfigExpandable = ({
 };
 
 interface AnacondaNetworkInterfaceProps {
-    iface: any;
+    iface: NMInterface;
 }
 
-const connectionState = (dev: any, isManaged: boolean) => {
+const connectionState = (dev: NMDevice, isManaged: boolean) => {
     if (!dev) {
         return _("Inactive");
     } else if (isManaged) {
@@ -161,7 +166,7 @@ export const AnacondaNetworkInterface = ({
 
     const devName = iface.Name;
     const dev = iface.Device;
-    const connectionSettings = iface?.MainConnection?.Settings || createGhostConnectionSettings(devName, dev);
+    const connectionSettings = iface?.MainConnection?.Settings || (createGhostConnectionSettings(devName, dev) as NMConnectionSettings);
     const isManaged = iface && (!dev || is_managed(dev));
 
     const connectionStatus = connectionState(dev, isManaged);
